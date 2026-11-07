@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: 0error-backend
+
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:0error}
+    username: ${DB_USER:0error}
+    password: ${DB_PASSWORD:0error_dev}
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  # Flyway owns a short-lived JDBC connection for migrations; the application
+  # itself only uses R2DBC. Boot 4 backs off JDBC DataSource auto-config when an
+  # R2DBC ConnectionFactory exists, so Flyway gets an explicit URL.
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:0error}
+    user: ${DB_USER:0error}
+    password: ${DB_PASSWORD:0error_dev}
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    clean-disabled: true
+    validate-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+      connect-timeout: 2s
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+  ai:
+    openai:
+      # Placeholder keeps the context bootable without a key. Real keys come from the environment.
+      api-key: ${OPENAI_API_KEY:unset}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4.1-mini}
+          temperature: 0.6
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  telemetry:
+    raw-retention-days: ${TELEMETRY_RAW_RETENTION_DAYS:30}
+    max-batch-size: ${TELEMETRY_MAX_BATCH_SIZE:500}
