@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, RotateCcw } from 'lucide-react'
 
 import { fetchDrillSet } from './features/drills/drillApi'
+import { streamFeedback } from './features/feedback/feedbackApi'
 import { activeTier, fetchProgress } from './features/progress/progressApi'
 import { completeServerSession, createServerSession } from './features/sessions/sessionApi'
 import type { SessionCompletion } from './features/sessions/sessionApi'
@@ -339,6 +340,8 @@ function ResultPanel({
         </ul>
       ) : null}
 
+      <CoachNote sessionId={drill.sessionId} />
+
       <button
         type="button"
         onClick={onNext}
@@ -347,6 +350,54 @@ function ResultPanel({
         {result.passed ? 'Next drill' : 'Try again'}
         <ArrowRight size={13} strokeWidth={1.75} />
       </button>
+    </div>
+  )
+}
+
+/**
+ * Streams the post-session coaching note. The server always sends something:
+ * model tokens when configured, deterministic sentences otherwise.
+ */
+function CoachNote({ sessionId }: { sessionId: string }) {
+  const [text, setText] = useState('')
+  const [state, setState] = useState<'streaming' | 'done' | 'error'>('streaming')
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let active = true
+
+    void streamFeedback(sessionId, controller.signal, {
+      onToken: (token) => setText((current) => current + token),
+      onDone: () => setState('done'),
+    }).catch(() => {
+      if (!active || controller.signal.aborted) return
+      setState('error')
+    })
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [sessionId])
+
+  return (
+    <div
+      className="mt-8 rounded-xl bg-stone-100/70 px-5 py-4 dark:bg-stone-900/70"
+      aria-busy={state === 'streaming'}
+    >
+      <p className="text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
+        Coach
+      </p>
+      <p className="mt-2 min-h-10 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        {state === 'error'
+          ? 'Coaching is unavailable right now. Your metrics are saved.'
+          : text === '' && state === 'streaming'
+            ? 'Reading your run\u2026'
+            : text}
+        {state === 'streaming' && text !== '' ? (
+          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-stone-300 align-text-bottom dark:bg-stone-600" />
+        ) : null}
+      </p>
     </div>
   )
 }
