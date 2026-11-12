@@ -1,11 +1,7 @@
 package com.rho.backend.drills;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
+import com.rho.backend.ai.AiChatClient;
+
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Mono;
@@ -19,70 +15,33 @@ import reactor.core.scheduler.Schedulers;
 @Component
 public class OpenAiDrillGenerator implements DrillGenerator {
 
-	private static final Logger log = LoggerFactory.getLogger(OpenAiDrillGenerator.class);
-
 	private static final String SYSTEM_PROMPT = """
 			You write short touch-typing drills for absolute beginners.
 			Reply with the drill text only. No title, no quotes, no explanation.
 			""";
 
-	private final ObjectProvider<ChatModel> chatModel;
+	private final AiChatClient chat;
 	private final AiDrillProperties properties;
-	private final String apiKey;
 
-	private volatile ChatClient client;
-
-	public OpenAiDrillGenerator(
-			ObjectProvider<ChatModel> chatModel,
-			AiDrillProperties properties,
-			@Value("${spring.ai.openai.api-key:unset}") String apiKey) {
-		this.chatModel = chatModel;
+	public OpenAiDrillGenerator(AiChatClient chat, AiDrillProperties properties) {
+		this.chat = chat;
 		this.properties = properties;
-		this.apiKey = apiKey;
 	}
 
 	@Override
 	public Mono<String> generate(TierDefinition tier, String exclude) {
-		if (!configured()) {
+		if (!properties.enabled()) {
 			return Mono.empty();
 		}
 
-		return Mono.fromCallable(() -> {
-					ChatClient chat = client();
-					if (chat == null) {
-						return null;
-					}
-					return clean(chat.prompt()
+		return Mono.fromCallable(() -> chat.maybeGet()
+					.map(client -> clean(client.prompt()
 							.system(SYSTEM_PROMPT)
 							.user(userPrompt(tier, exclude))
 							.call()
-							.content());
-				})
+							.content()))
+					.orElse(null))
 				.subscribeOn(Schedulers.boundedElastic());
-	}
-
-	private boolean configured() {
-		return properties.enabled() && apiKey != null && !apiKey.isBlank() && !"unset".equals(apiKey);
-	}
-
-	private ChatClient client() {
-		ChatClient existing = client;
-		if (existing != null) {
-			return existing;
-		}
-
-		ChatModel model = chatModel.getIfAvailable();
-		if (model == null) {
-			log.warn("No chat model bean is available; generated drills stay off");
-			return null;
-		}
-
-		synchronized (this) {
-			if (client == null) {
-				client = ChatClient.create(model);
-			}
-			return client;
-		}
 	}
 
 	private static String userPrompt(TierDefinition tier, String exclude) {
