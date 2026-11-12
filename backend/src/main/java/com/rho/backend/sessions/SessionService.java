@@ -3,9 +3,13 @@ package com.rho.backend.sessions;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import com.rho.backend.progress.TierProgressService;
+
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Mono;
 
@@ -13,17 +17,29 @@ import reactor.core.publisher.Mono;
 public class SessionService {
 
 	private final TypingSessionRepository sessions;
+	private final TierProgressService progress;
 	private final DatabaseClient databaseClient;
 
-	public SessionService(TypingSessionRepository sessions, DatabaseClient databaseClient) {
+	public SessionService(
+			TypingSessionRepository sessions,
+			TierProgressService progress,
+			DatabaseClient databaseClient) {
 		this.sessions = sessions;
+		this.progress = progress;
 		this.databaseClient = databaseClient;
 	}
 
 	public Mono<CreatedSession> create(UUID userId, CreateSessionRequest request) {
-		return sessions.findByUserIdAndClientSessionId(userId, request.clientSessionId())
-				.map(existing -> new CreatedSession(existing, false))
-				.switchIfEmpty(Mono.defer(() -> insert(userId, request)));
+		return progress.isUnlocked(userId, request.tier())
+				.flatMap(unlocked -> {
+					if (!unlocked) {
+						return Mono.error(new ResponseStatusException(
+								HttpStatus.FORBIDDEN, "Tier " + request.tier() + " is locked"));
+					}
+					return sessions.findByUserIdAndClientSessionId(userId, request.clientSessionId())
+							.map(existing -> new CreatedSession(existing, false))
+							.switchIfEmpty(Mono.defer(() -> insert(userId, request)));
+				});
 	}
 
 	private Mono<CreatedSession> insert(UUID userId, CreateSessionRequest request) {
