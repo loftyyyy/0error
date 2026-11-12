@@ -22,7 +22,7 @@ export interface KeystrokeCapture {
   notice: CaptureNotice
   pause: () => void
   resume: () => void
-  flush: () => Promise<void>
+  flush: () => Promise<boolean>
 }
 
 const NOTICE_TIMEOUT_MS = 2_500
@@ -78,7 +78,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
   }, [engine])
 
   const flush = useCallback(() => {
-    return bufferRef.current?.flush() ?? Promise.resolve()
+    return bufferRef.current?.flush() ?? Promise.resolve(true)
   }, [])
 
   useEffect(() => {
@@ -106,8 +106,11 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
       bufferRef.current?.push([event])
 
       if (engine.isComplete) {
-        void bufferRef.current?.flush()
-        onCompleteRef.current?.(engine.snapshot())
+        const finished = engine.snapshot()
+        // Score only after the last keystrokes reach the server.
+        void (bufferRef.current?.flush() ?? Promise.resolve())
+          .catch(() => undefined)
+          .then(() => onCompleteRef.current?.(finished))
       }
     }
 

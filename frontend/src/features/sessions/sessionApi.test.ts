@@ -128,3 +128,71 @@ describe('createServerSession', () => {
     expect(storage.getItem(GUEST_TOKEN_KEY)).toBe('g_fresh')
   })
 })
+
+const completionBody = {
+  sessionId: sessionBody.id,
+  tier: 0,
+  status: 'COMPLETED',
+  metrics: {
+    keystrokeCount: 150,
+    correctCount: 149,
+    accuracy: 99.33,
+    medianInterKeyMs: 240,
+    p95InterKeyMs: 410,
+    hesitationCount: 0,
+  },
+  passed: true,
+  consecutivePasses: 2,
+  failedAttempts: 0,
+  unlockedTier: 1,
+  medianThresholdMs: 450,
+  p95ThresholdMs: 900,
+  accuracyThreshold: 96,
+  minimumKeystrokes: 120,
+  failures: [],
+}
+
+describe('completeServerSession', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const storage = new MemoryStorage()
+    storage.setItem(GUEST_TOKEN_KEY, 'g_existing')
+    storage.setItem(GUEST_ID_KEY, 'guest-existing')
+    vi.stubGlobal('localStorage', storage)
+  })
+
+  it('posts to the completion route and returns server truth', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse(completionBody))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { completeServerSession } = await import('./sessionApi')
+    const completion = await completeServerSession(sessionBody.id)
+
+    expect(completion).toMatchObject({
+      passed: true,
+      consecutivePasses: 2,
+      unlockedTier: 1,
+    })
+    expect(completion.metrics.medianInterKeyMs).toBe(240)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe(`/api/v1/sessions/${sessionBody.id}/complete`)
+    expect(init?.method).toBe('POST')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
+  })
+
+  it('reports an already scored session', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'conflict' }, 409)),
+    )
+
+    const { completeServerSession } = await import('./sessionApi')
+
+    await expect(completeServerSession(sessionBody.id)).rejects.toThrow(
+      'This drill was already scored',
+    )
+  })
+})

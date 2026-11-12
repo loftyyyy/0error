@@ -2,6 +2,7 @@ import type { KeystrokeEvent } from '../typing/typingEngine'
 import { apiUrl } from '../../lib/api'
 import { GUEST_TOKEN_KEY, readGuestToken } from '../identity/guestSession'
 import {
+  countPendingBatches,
   deleteBatch,
   enqueueBatch,
   markBatchAttempt,
@@ -92,6 +93,23 @@ export function drainOutbox(apiBase = API_BASE): Promise<void> {
 }
 
 /**
+ * Drains until this session has no queued batches, so scoring never races
+ * ahead of the keystrokes it is meant to score. Returns false when batches are
+ * still held back for a retry, which means the caller must not complete yet.
+ */
+export async function flushSession(
+  sessionId: string,
+  apiBase = API_BASE,
+  attempts = 3,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await drainOutbox(apiBase)
+    if ((await countPendingBatches(sessionId)) === 0) return true
+  }
+  return false
+}
+
+/**
  * Per-session telemetry buffer. Events are persisted to IndexedDB before any
  * network call, so a closed tab or offline moment never drops raw keystrokes.
  */
@@ -133,7 +151,7 @@ export class TelemetryBuffer {
     }
   }
 
-  async flush(): Promise<void> {
+  async flush(): Promise<boolean> {
     while (this.pending.length > 0) {
       const events = this.pending.splice(0, BATCH_SIZE)
       await enqueueBatch({
@@ -143,7 +161,7 @@ export class TelemetryBuffer {
         events,
       })
     }
-    await drainOutbox(this.apiBase)
+    return flushSession(this.sessionId, this.apiBase)
   }
 
   stop(): void {

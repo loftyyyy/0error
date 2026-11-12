@@ -131,6 +131,24 @@ export async function deleteBatch(id: number): Promise<void> {
   if (index >= 0) memoryBatches.splice(index, 1)
 }
 
+/** Number of queued batches for one session, used to prove telemetry landed. */
+export async function countPendingBatches(sessionId: string): Promise<number> {
+  if (!memoryMode) {
+    try {
+      const db = await openDb()
+      const transaction = db.transaction(STORE, 'readonly')
+      const store = transaction.objectStore(STORE)
+      const count = await requestToPromise(store.index('sessionId').count(sessionId))
+      await transactionDone(transaction)
+      return count
+    } catch {
+      memoryMode = true
+    }
+  }
+
+  return memoryBatches.filter((batch) => batch.sessionId === sessionId).length
+}
+
 export async function markBatchAttempt(id: number): Promise<void> {
   if (memoryMode) {
     const batch = memoryBatches.find((candidate) => candidate.id === id)
