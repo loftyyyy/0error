@@ -1,4 +1,6 @@
 import type { KeystrokeEvent } from '../typing/typingEngine'
+import { apiUrl } from '../../lib/api'
+import { GUEST_TOKEN_KEY, readGuestToken } from '../identity/guestSession'
 import {
   deleteBatch,
   enqueueBatch,
@@ -7,20 +9,12 @@ import {
 } from './keystrokeQueue'
 import type { KeystrokeBatch } from './keystrokeQueue'
 
+export { GUEST_TOKEN_KEY }
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 const BATCH_SIZE = 100
 const FLUSH_INTERVAL_MS = 5_000
 const MAX_BATCHES_PER_DRAIN = 25
-
-export const GUEST_TOKEN_KEY = '0error.guestToken'
-
-function readGuestToken(): string | null {
-  try {
-    return localStorage.getItem(GUEST_TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
 
 function newBatchId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -42,7 +36,7 @@ async function postBatch(batch: KeystrokeBatch, apiBase: string): Promise<PostRe
   let response: Response
   try {
     response = await fetch(
-      `${apiBase}/api/sessions/${encodeURIComponent(batch.sessionId)}/telemetry`,
+      apiUrl(`/api/v1/sessions/${encodeURIComponent(batch.sessionId)}/telemetry`, apiBase),
       {
         method: 'POST',
         headers,
