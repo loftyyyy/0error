@@ -1,5 +1,6 @@
 package com.rho.backend.drills;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import com.rho.backend.progress.TierProgressService;
@@ -16,16 +17,19 @@ public class DrillService {
 	private final TierCatalogue catalogue;
 	private final StaticDrillPool pool;
 	private final DrillValidator validator;
+	private final AiDrillCache aiDrills;
 	private final TierProgressService progress;
 
 	public DrillService(
 			TierCatalogue catalogue,
 			StaticDrillPool pool,
 			DrillValidator validator,
+			AiDrillCache aiDrills,
 			TierProgressService progress) {
 		this.catalogue = catalogue;
 		this.pool = pool;
 		this.validator = validator;
+		this.aiDrills = aiDrills;
 		this.progress = progress;
 	}
 
@@ -40,16 +44,23 @@ public class DrillService {
 									HttpStatus.FORBIDDEN, "Tier " + tier + " is locked"));
 						}
 
-						String text = pool.pick(tier, exclude);
+						Optional<String> generated = aiDrills.take(tier, exclude)
+								.filter(candidate -> validator.isValid(candidate, definition));
+
+						String source = generated.isPresent() ? "AI" : "STATIC";
+						String text = generated.orElseGet(() -> pool.pick(tier, exclude));
 						validator.validate(text, definition).ifPresent(error -> {
 							throw new IllegalStateException("Configured drill is invalid: " + error);
 						});
+
+						// Keep the cache warm for the next request, never for this one.
+						aiDrills.refill(definition, text);
 
 						return Mono.just(new DrillResponse(
 								tier,
 								definition.name(),
 								definition.charset(),
-								"STATIC",
+								source,
 								text,
 								text.length()));
 					});
