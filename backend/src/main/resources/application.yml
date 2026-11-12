@@ -69,3 +69,5 @@ app:
   telemetry:
     raw-retention-days: ${TELEMETRY_RAW_RETENTION_DAYS:30}
     max-batch-size: ${TELEMETRY_MAX_BATCH_SIZE:500}
+    purge-batch-size: ${TELEMETRY_PURGE_BATCH_SIZE:1000}
+    purge-cron: ${TELEMETRY_PURGE_CRON:0 30 3 * * *}
