@@ -7,6 +7,8 @@ import { activeTier, fetchProgress } from './features/progress/progressApi'
 import { completeServerSession, createServerSession } from './features/sessions/sessionApi'
 import type { SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
+import { KeyboardGuide } from './features/typing/KeyboardGuide'
+import { useHesitation } from './features/typing/useHesitation'
 import { useKeystrokeCapture } from './features/typing/useKeystrokeCapture'
 
 function newClientSessionId(): string {
@@ -219,6 +221,10 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
   const progress = snapshot.length === 0 ? 0 : (snapshot.index / snapshot.length) * 100
   const isPaused = snapshot.status === 'paused'
   const isComplete = snapshot.status === 'complete'
+  const running = snapshot.status === 'running' && !scoring
+
+  // Each keystroke restarts the timer; only a real pause reveals the guide.
+  const hesitating = useHesitation(snapshot.eventCount, running)
 
   return (
     <div
@@ -281,6 +287,12 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
       <div className="mt-2 h-5 text-xs text-stone-400 dark:text-stone-500" aria-live="polite">
         {notice === 'paste-blocked' ? 'Paste is off. Type it out.' : null}
       </div>
+
+      <KeyboardGuide
+        character={drill.text[snapshot.index] ?? null}
+        hesitating={hesitating}
+        visible={!scoring}
+      />
     </div>
   )
 }
