@@ -9,6 +9,12 @@ export type TypingStatus = 'running' | 'paused' | 'complete'
 
 export type KeystrokeKind = 'KEY' | 'BACKSPACE'
 
+/**
+ * Rhythm of one typed character. Fluency is timing only: a clean, quick key
+ * fades into the background, while a pause leaves a warm trace.
+ */
+export type StrokeQuality = 'warmup' | 'smooth' | 'steady' | 'hesitant'
+
 export interface KeystrokeEvent {
   /** Monotonic per-session sequence. Part of the server-side idempotency key. */
   seq: number
@@ -38,6 +44,8 @@ export interface TypingSnapshot {
   warmupRemaining: number
   eventCount: number
   elapsedMs: number
+  /** One entry per drill character; null until that position is typed. */
+  quality: readonly (StrokeQuality | null)[]
 }
 
 export interface TypingEngineOptions {
@@ -49,6 +57,10 @@ export interface TypingEngineOptions {
 
 export const WARMUP_KEYSTROKES = 3
 export const HESITATION_GAP_MS = 1500
+/** Below this gap a key reads as flowing. */
+export const SMOOTH_KEY_MS = 400
+/** Below this gap a key reads as steady; beyond it the pause is visible. */
+export const STEADY_KEY_MS = 900
 
 export class TypingEngine {
   readonly text: string
@@ -75,6 +87,8 @@ export class TypingEngine {
   private eventCount = 0
   private lastKeyAt: number | null = null
   private hesitationCount = 0
+  /** Rhythm per target position, so the text track can show pauses. */
+  private readonly quality: (StrokeQuality | null)[]
   /** Accuracy is first-attempt per position; corrections never erase an error. */
   private readonly scoredPositions = new Set<number>()
 
@@ -89,6 +103,7 @@ export class TypingEngine {
     this.allowBackspace = options.allowBackspace ?? true
     this.startedAt = this.now()
     this.targetShownAt = 0
+    this.quality = new Array(text.length).fill(null)
   }
 
   get isComplete(): boolean {
@@ -162,6 +177,8 @@ export class TypingEngine {
     const isWarmup = this.warmupRemaining > 0
     const correct = key === expected
     const displayMs = Math.max(0, Math.round(t - this.targetShownAt))
+    const gap = this.lastKeyAt === null ? displayMs : t - this.lastKeyAt
+    this.quality[this.position] = isWarmup ? 'warmup' : qualityFor(gap)
 
     if (isWarmup) {
       this.warmupRemaining -= 1
@@ -217,6 +234,7 @@ export class TypingEngine {
       warmupRemaining: this.warmupRemaining,
       eventCount: this.eventCount,
       elapsedMs: Math.round(this.elapsed(at)),
+      quality: [...this.quality],
     }
   }
 
@@ -262,4 +280,11 @@ export class TypingEngine {
     this.changed()
     return recorded
   }
+}
+
+/** Turns the gap before a key into the rhythm shown on the text track. */
+function qualityFor(gapMs: number): StrokeQuality {
+  if (gapMs <= SMOOTH_KEY_MS) return 'smooth'
+  if (gapMs <= STEADY_KEY_MS) return 'steady'
+  return 'hesitant'
 }

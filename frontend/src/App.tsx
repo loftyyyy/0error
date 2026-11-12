@@ -8,6 +8,7 @@ import { completeServerSession, createServerSession } from './features/sessions/
 import type { SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
+import { characterClass } from './features/typing/characterClass'
 import { useHesitation } from './features/typing/useHesitation'
 import { useKeystrokeCapture } from './features/typing/useKeystrokeCapture'
 
@@ -160,8 +161,9 @@ function App() {
         ) : null}
 
         <footer className="mt-20 text-xs leading-relaxed text-stone-400 dark:text-stone-600">
-          Telemetry queues locally until the API acknowledges it. Focus loss pauses the clock. Three
-          keystrokes after a pause are warmup and never scored.
+          Clean keys fade; a warm letter marks a pause. Telemetry queues locally until the API
+          acknowledges it. Focus loss pauses the clock. Three keystrokes after a pause are warmup
+          and never scored.
         </footer>
       </div>
     </main>
@@ -244,13 +246,7 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
           return (
             <span
               key={`${character}-${index}`}
-              className={
-                state === 'done'
-                  ? 'text-stone-300 dark:text-stone-700'
-                  : state === 'current'
-                    ? 'border-b-2 border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100'
-                    : 'text-stone-400 dark:text-stone-500'
-              }
+              className={characterClass(state, snapshot.quality[index] ?? null)}
             >
               {character === ' ' ? '\u00a0' : character}
             </span>
