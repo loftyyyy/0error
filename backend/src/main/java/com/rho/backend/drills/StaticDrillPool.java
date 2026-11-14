@@ -41,6 +41,14 @@ public class StaticDrillPool {
 
 	/** Picks a drill, avoiding the previous text when the pool allows it. */
 	public String pick(int tier, String exclude) {
+		return pick(tier, List.of(), exclude);
+	}
+
+	/**
+	 * Picks a drill, preferring one that contains a focus pair. When no
+	 * candidate covers a weak transition, the ordinary pool still answers.
+	 */
+	public String pick(int tier, List<String> focusPairs, String exclude) {
 		List<String> candidates = forTier(tier);
 		if (candidates.isEmpty()) {
 			throw new IllegalStateException("No static drill configured for tier " + tier);
@@ -51,6 +59,25 @@ public class StaticDrillPool {
 				.toList();
 		List<String> pool = filtered.isEmpty() ? candidates : filtered;
 
+		List<String> targeted = pool.stream()
+				.filter(candidate -> containsAny(candidate, focusPairs))
+				.toList();
+		if (!targeted.isEmpty()) {
+			pool = targeted;
+		}
+
 		return pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
+	}
+
+	private static boolean containsAny(String text, List<String> focusPairs) {
+		if (focusPairs == null) {
+			return false;
+		}
+		for (String pair : focusPairs) {
+			if (pair != null && pair.length() == 2 && text.contains(pair)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -1,5 +1,7 @@
 package com.rho.backend.drills;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,5 +28,16 @@ class OpenAiDrillGeneratorTest {
 	void emptyOutputStaysEmpty() {
 		assertThat(OpenAiDrillGenerator.clean(null)).isNull();
 		assertThat(OpenAiDrillGenerator.clean("  \n ")).isNull();
+	}
+
+	@Test
+	void promptNamesTheFocusPairsOnlyWhenPresent() {
+		TierDefinition tier = new TierCatalogue().require(2);
+
+		String withFocus = OpenAiDrillGenerator.userPrompt(tier, List.of("bn", "m,"), null);
+		String withoutFocus = OpenAiDrillGenerator.userPrompt(tier, List.of(), null);
+
+		assertThat(withFocus).contains("bn, m,");
+		assertThat(withoutFocus).doesNotContain("hesitates");
 	}
 }

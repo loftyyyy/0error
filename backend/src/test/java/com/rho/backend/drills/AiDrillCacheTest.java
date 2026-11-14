@@ -3,6 +3,7 @@ package com.rho.backend.drills;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -65,7 +66,7 @@ class AiDrillCacheTest {
 			calls.incrementAndGet();
 			return Mono.just(staticDrills.get(0));
 		};
-		AiDrillCache cache = cache(generator, new AiDrillProperties(false, 2, 60));
+		AiDrillCache cache = cache(generator, new AiDrillProperties(false, 2, 60, 32));
 
 		cache.refill(homeRow, null);
 
@@ -83,12 +84,66 @@ class AiDrillCacheTest {
 		assertThat(cache.size(0)).isEqualTo(1);
 	}
 
+	@Test
+	void focusSetsKeepTheirOwnQueuesAndReachTheGenerator() {
+		AtomicReference<List<String>> seen = new AtomicReference<>();
+		DrillGenerator generator = new DrillGenerator() {
+
+			@Override
+			public Mono<String> generate(TierDefinition tier, String exclude) {
+				return Mono.empty();
+			}
+
+			@Override
+			public Mono<String> generate(
+					TierDefinition tier, List<String> focusPairs, String exclude) {
+				seen.set(focusPairs);
+				return Mono.just(staticDrills.get(0));
+			}
+		};
+		AiDrillCache cache = cache(generator, properties(2, 60));
+
+		cache.refill(homeRow, List.of("dk"), null);
+
+		assertThat(seen.get()).containsExactly("dk");
+		assertThat(cache.take(0, List.of("sl"), null)).isEmpty();
+		assertThat(cache.take(0, List.of("dk"), null)).contains(staticDrills.get(0));
+	}
+
+	@Test
+	void focusKeysAreBoundedAndTheEldestIsEvicted() throws InterruptedException {
+		AiDrillCache cache = cache(
+				generator(staticDrills.toArray(String[]::new)), properties(2, 60, 2));
+
+		cache.refill(homeRow, List.of("dk"), null);
+		Thread.sleep(2);
+		cache.refill(homeRow, List.of("sl"), null);
+		Thread.sleep(2);
+		cache.refill(homeRow, List.of("a;"), null);
+
+		assertThat(cache.keyCount()).isEqualTo(2);
+		assertThat(cache.take(0, List.of("dk"), null)).isEmpty();
+		assertThat(cache.take(0, List.of("a;"), null)).contains(staticDrills.get(2));
+	}
+
+	@Test
+	void focusSignatureIgnoresTheOrderOfPairs() {
+		assertThat(AiDrillCache.cacheKey(2, List.of("bn", "m,")))
+				.isEqualTo(AiDrillCache.cacheKey(2, List.of("m,", "bn")));
+		assertThat(AiDrillCache.cacheKey(2, List.of("bn")))
+				.isNotEqualTo(AiDrillCache.cacheKey(2, List.of()));
+	}
+
 	private AiDrillCache cache(DrillGenerator generator, AiDrillProperties properties) {
 		return new AiDrillCache(generator, validator, properties);
 	}
 
 	private static AiDrillProperties properties(int cacheSize, int ttlMinutes) {
-		return new AiDrillProperties(true, cacheSize, ttlMinutes);
+		return new AiDrillProperties(true, cacheSize, ttlMinutes, 32);
+	}
+
+	private static AiDrillProperties properties(int cacheSize, int ttlMinutes, int maxFocusKeys) {
+		return new AiDrillProperties(true, cacheSize, ttlMinutes, maxFocusKeys);
 	}
 
 	private static DrillGenerator generator(String... outputs) {

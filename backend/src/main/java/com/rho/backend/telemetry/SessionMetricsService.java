@@ -1,5 +1,6 @@
 package com.rho.backend.telemetry;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.r2dbc.core.DatabaseClient;
@@ -26,7 +27,15 @@ public class SessionMetricsService {
 	public Mono<SessionMetrics> recompute(UUID sessionId) {
 		return events.findBySessionIdOrderBySeqAsc(sessionId)
 				.collectList()
-				.map(SessionMetricsCalculator::calculate)
+				.flatMap(rawEvents -> recompute(sessionId, rawEvents));
+	}
+
+	/**
+	 * Recomputes from an already loaded event list. Completion uses this so the
+	 * raw keystrokes are read once and shared with pair analysis.
+	 */
+	public Mono<SessionMetrics> recompute(UUID sessionId, List<KeystrokeEvent> rawEvents) {
+		return Mono.fromSupplier(() -> SessionMetricsCalculator.calculate(rawEvents))
 				.flatMap(metrics -> update(sessionId, metrics).thenReturn(metrics));
 	}
 

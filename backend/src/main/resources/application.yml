@@ -71,6 +71,7 @@ app:
       enabled: ${DRILL_AI_ENABLED:true}
       cache-size: ${DRILL_AI_CACHE_SIZE:2}
       ttl-minutes: ${DRILL_AI_TTL_MINUTES:1440}
+      max-focus-keys: ${DRILL_AI_MAX_FOCUS_KEYS:32}
   telemetry:
     raw-retention-days: ${TELEMETRY_RAW_RETENTION_DAYS:30}
     max-batch-size: ${TELEMETRY_MAX_BATCH_SIZE:500}

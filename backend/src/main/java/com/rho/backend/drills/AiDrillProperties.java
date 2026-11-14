@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * when it is empty or disabled, drills come from the static pool.
  */
 @ConfigurationProperties(prefix = "app.drills.ai")
-public record AiDrillProperties(boolean enabled, int cacheSize, int ttlMinutes) {
+public record AiDrillProperties(boolean enabled, int cacheSize, int ttlMinutes, int maxFocusKeys) {
 
 	public AiDrillProperties {
 		if (cacheSize <= 0) {
@@ -15,6 +15,9 @@ public record AiDrillProperties(boolean enabled, int cacheSize, int ttlMinutes) 
 		}
 		if (ttlMinutes <= 0) {
 			ttlMinutes = 24 * 60;
+		}
+		if (maxFocusKeys <= 0) {
+			maxFocusKeys = 32;
 		}
 	}
 }

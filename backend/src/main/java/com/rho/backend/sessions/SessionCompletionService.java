@@ -2,8 +2,10 @@ package com.rho.backend.sessions;
 
 import java.util.UUID;
 
+import com.rho.backend.analysis.WeakPairService;
 import com.rho.backend.progress.GateOutcome;
 import com.rho.backend.progress.TierProgressService;
+import com.rho.backend.telemetry.KeystrokeEventRepository;
 import com.rho.backend.telemetry.SessionMetrics;
 import com.rho.backend.telemetry.SessionMetricsService;
 
@@ -26,16 +28,22 @@ public class SessionCompletionService {
 	private final TypingSessionRepository sessions;
 	private final SessionMetricsService metrics;
 	private final TierProgressService progress;
+	private final WeakPairService weakPairs;
+	private final KeystrokeEventRepository keystrokes;
 	private final DatabaseClient databaseClient;
 
 	public SessionCompletionService(
 			TypingSessionRepository sessions,
 			SessionMetricsService metrics,
 			TierProgressService progress,
+			WeakPairService weakPairs,
+			KeystrokeEventRepository keystrokes,
 			DatabaseClient databaseClient) {
 		this.sessions = sessions;
 		this.metrics = metrics;
 		this.progress = progress;
+		this.weakPairs = weakPairs;
+		this.keystrokes = keystrokes;
 		this.databaseClient = databaseClient;
 	}
 
@@ -50,10 +58,16 @@ public class SessionCompletionService {
 								HttpStatus.CONFLICT, "Session is already " + session.status()));
 					}
 
-					return metrics.recompute(sessionId)
-							.flatMap(aggregates -> progress.applyCompletion(userId, session.tier(), aggregates)
-									.flatMap(outcome -> markCompleted(sessionId)
-											.thenReturn(toResponse(sessionId, session.tier(), aggregates, outcome))));
+					return keystrokes.findBySessionIdOrderBySeqAsc(sessionId)
+							.collectList()
+							.flatMap(rawEvents -> metrics.recompute(sessionId, rawEvents)
+									.flatMap(aggregates -> progress
+											.applyCompletion(userId, session.tier(), aggregates)
+											.flatMap(outcome -> weakPairs
+													.recordSession(userId, session.tier(), rawEvents)
+													.then(markCompleted(sessionId))
+													.thenReturn(toResponse(
+															sessionId, session.tier(), aggregates, outcome)))));
 				});
 	}
 

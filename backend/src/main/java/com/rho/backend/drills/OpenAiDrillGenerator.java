@@ -1,5 +1,7 @@
 package com.rho.backend.drills;
 
+import java.util.List;
+
 import com.rho.backend.ai.AiChatClient;
 
 import org.springframework.stereotype.Component;
@@ -30,6 +32,11 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 
 	@Override
 	public Mono<String> generate(TierDefinition tier, String exclude) {
+		return generate(tier, List.of(), exclude);
+	}
+
+	@Override
+	public Mono<String> generate(TierDefinition tier, List<String> focusPairs, String exclude) {
 		if (!properties.enabled()) {
 			return Mono.empty();
 		}
@@ -37,14 +44,14 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 		return Mono.fromCallable(() -> chat.maybeGet()
 					.map(client -> clean(client.prompt()
 							.system(SYSTEM_PROMPT)
-							.user(userPrompt(tier, exclude))
+							.user(userPrompt(tier, focusPairs, exclude))
 							.call()
 							.content()))
 					.orElse(null))
 				.subscribeOn(Schedulers.boundedElastic());
 	}
 
-	private static String userPrompt(TierDefinition tier, String exclude) {
+	static String userPrompt(TierDefinition tier, List<String> focusPairs, String exclude) {
 		StringBuilder prompt = new StringBuilder()
 				.append("Write one drill between ").append(tier.minLength()).append(" and ")
 				.append(tier.maxLength()).append(" characters long.\n")
@@ -52,6 +59,11 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 				.append(tier.charset()).append('\n')
 				.append("Keep it rhythmic and easy to type. Never emit a newline.\n");
 
+		if (focusPairs != null && !focusPairs.isEmpty()) {
+			prompt.append("The typist hesitates on these key transitions; ")
+					.append("include them naturally and more than once: ")
+					.append(String.join(", ", focusPairs)).append('\n');
+		}
 		if (exclude != null && !exclude.isBlank()) {
 			prompt.append("Do not repeat this drill: ").append(exclude).append('\n');
 		}
