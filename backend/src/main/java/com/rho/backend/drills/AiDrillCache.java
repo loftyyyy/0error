@@ -22,9 +22,10 @@ import reactor.core.publisher.Mono;
  * it is ready; otherwise the static pool answers and a refill happens in the
  * background. This keeps the LLM off the request path entirely.
  *
- * <p>Queues are keyed by tier and the focus pairs they were written for, so a
- * drill targeting one weakness is never served to a different one. The number
- * of keys is bounded and the least recently used key is evicted first.
+ * <p>Queues are keyed by tier and the focus pairs or weak reach they were
+ * written for, so a drill targeting one weakness is never served to a
+ * different one. The number of keys is bounded and the least recently used key
+ * is evicted first.
  */
 @Component
 public class AiDrillCache {
@@ -49,12 +50,16 @@ public class AiDrillCache {
 	}
 
 	public Optional<String> take(int tier, String exclude) {
-		return take(tier, List.of(), exclude);
+		return take(tier, DrillFocus.none(), exclude);
+	}
+
+	public Optional<String> take(int tier, List<String> focusPairs, String exclude) {
+		return take(tier, DrillFocus.of(focusPairs), exclude);
 	}
 
 	/** Takes the oldest usable drill for this tier and focus set. */
-	public Optional<String> take(int tier, List<String> focusPairs, String exclude) {
-		FocusQueue queue = byKey.get(cacheKey(tier, focusPairs));
+	public Optional<String> take(int tier, DrillFocus focus, String exclude) {
+		FocusQueue queue = byKey.get(cacheKey(tier, focus));
 		if (queue == null) {
 			return Optional.empty();
 		}
@@ -75,20 +80,24 @@ public class AiDrillCache {
 	}
 
 	public void refill(TierDefinition tier, String exclude) {
-		refill(tier, List.of(), exclude);
+		refill(tier, DrillFocus.none(), exclude);
+	}
+
+	public void refill(TierDefinition tier, List<String> focusPairs, String exclude) {
+		refill(tier, DrillFocus.of(focusPairs), exclude);
 	}
 
 	/**
 	 * Starts at most one background generation per tier and focus set. Invalid
 	 * output is discarded; a failure only means the static pool keeps serving.
 	 */
-	public void refill(TierDefinition tier, List<String> focusPairs, String exclude) {
+	public void refill(TierDefinition tier, DrillFocus focus, String exclude) {
 		if (!properties.enabled()) {
 			return;
 		}
 
-		List<String> focus = focusPairs == null ? List.of() : List.copyOf(focusPairs);
-		String key = cacheKey(tier.tier(), focus);
+		DrillFocus target = focus == null ? DrillFocus.none() : focus;
+		String key = cacheKey(tier.tier(), target);
 		FocusQueue queue = queue(key);
 		if (queue.drills.size() >= properties.cacheSize()) {
 			return;
@@ -97,7 +106,7 @@ public class AiDrillCache {
 			return;
 		}
 
-		generator.generate(tier, focus, exclude)
+		generator.generate(tier, target, exclude)
 				.filter(text -> validator.isValid(text, tier))
 				.doOnNext(text -> store(key, text))
 				.doOnError(error -> log.warn("Drill generation failed for tier {}", tier.tier(), error))
@@ -116,7 +125,11 @@ public class AiDrillCache {
 	}
 
 	int size(int tier, List<String> focusPairs) {
-		FocusQueue queue = byKey.get(cacheKey(tier, focusPairs));
+		return size(tier, DrillFocus.of(focusPairs));
+	}
+
+	int size(int tier, DrillFocus focus) {
+		FocusQueue queue = byKey.get(cacheKey(tier, focus));
 		return queue == null ? 0 : queue.drills.size();
 	}
 
@@ -126,13 +139,19 @@ public class AiDrillCache {
 
 	/** Stable across focus ordering: focus sets are sorted before encoding. */
 	static String cacheKey(int tier, List<String> focusPairs) {
-		String signature = focusPairs == null ? "" : focusPairs.stream()
+		return cacheKey(tier, DrillFocus.of(focusPairs));
+	}
+
+	static String cacheKey(int tier, DrillFocus focus) {
+		DrillFocus target = focus == null ? DrillFocus.none() : focus;
+		String signature = target.pairs().stream()
 				.filter(pair -> pair != null && pair.length() == 2)
 				.distinct()
 				.sorted()
 				.map(AiDrillCache::encodePair)
 				.collect(Collectors.joining(","));
-		return tier + "|" + signature;
+		String finger = target.finger() == null ? "" : "f:" + target.finger().name();
+		return tier + "|" + signature + "|" + finger;
 	}
 
 	private static String encodePair(String pair) {

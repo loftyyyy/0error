@@ -12,11 +12,16 @@ public interface DrillGenerator {
 
 	Mono<String> generate(TierDefinition tier, String exclude);
 
-	/**
-	 * Generates a drill that leans on the typist's weak transitions. The
-	 * default ignores them, so simple generators keep working unchanged.
-	 */
+	/** Generates a drill that leans on the typist's weak transitions. */
 	default Mono<String> generate(TierDefinition tier, List<String> focusPairs, String exclude) {
 		return generate(tier, exclude);
+	}
+
+	/**
+	 * Generates a drill that leans on weak transitions or a weak reach. The
+	 * default passes the pairs along, so simple generators keep working.
+	 */
+	default Mono<String> generate(TierDefinition tier, DrillFocus focus, String exclude) {
+		return generate(tier, focus.pairs(), exclude);
 	}
 }

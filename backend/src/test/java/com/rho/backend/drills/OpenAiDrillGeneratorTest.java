@@ -2,6 +2,8 @@ package com.rho.backend.drills;
 
 import java.util.List;
 
+import com.rho.backend.analysis.Finger;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,5 +41,24 @@ class OpenAiDrillGeneratorTest {
 
 		assertThat(withFocus).contains("bn, m,");
 		assertThat(withoutFocus).doesNotContain("hesitates");
+	}
+
+	@Test
+	void promptNamesTheWeakFingerAndTheKeysItReaches() {
+		TierDefinition tier = new TierCatalogue().require(3);
+		String prompt = OpenAiDrillGenerator.userPrompt(
+				tier, new DrillFocus(List.of(), Finger.RIGHT_PINKY), null);
+
+		assertThat(prompt).contains("right pinky", "p;/-=[]'");
+		assertThat(prompt).doesNotContain("hesitates");
+	}
+
+	@Test
+	void aPairFocusIsMoreSpecificThanAFinger() {
+		TierDefinition tier = new TierCatalogue().require(3);
+		String prompt = OpenAiDrillGenerator.userPrompt(
+				tier, new DrillFocus(List.of("bn"), Finger.RIGHT_PINKY), null);
+
+		assertThat(prompt).contains("bn").doesNotContain("right pinky");
 	}
 }

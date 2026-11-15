@@ -32,11 +32,16 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 
 	@Override
 	public Mono<String> generate(TierDefinition tier, String exclude) {
-		return generate(tier, List.of(), exclude);
+		return generate(tier, DrillFocus.none(), exclude);
 	}
 
 	@Override
 	public Mono<String> generate(TierDefinition tier, List<String> focusPairs, String exclude) {
+		return generate(tier, DrillFocus.of(focusPairs), exclude);
+	}
+
+	@Override
+	public Mono<String> generate(TierDefinition tier, DrillFocus focus, String exclude) {
 		if (!properties.enabled()) {
 			return Mono.empty();
 		}
@@ -44,7 +49,7 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 		return Mono.fromCallable(() -> chat.maybeGet()
 					.map(client -> clean(client.prompt()
 							.system(SYSTEM_PROMPT)
-							.user(userPrompt(tier, focusPairs, exclude))
+							.user(userPrompt(tier, focus, exclude))
 							.call()
 							.content()))
 					.orElse(null))
@@ -52,6 +57,11 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 	}
 
 	static String userPrompt(TierDefinition tier, List<String> focusPairs, String exclude) {
+		return userPrompt(tier, DrillFocus.of(focusPairs), exclude);
+	}
+
+	static String userPrompt(TierDefinition tier, DrillFocus focus, String exclude) {
+		DrillFocus target = focus == null ? DrillFocus.none() : focus;
 		StringBuilder prompt = new StringBuilder()
 				.append("Write one drill between ").append(tier.minLength()).append(" and ")
 				.append(tier.maxLength()).append(" characters long.\n")
@@ -59,10 +69,19 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 				.append(tier.charset()).append('\n')
 				.append("Keep it rhythmic and easy to type. Never emit a newline.\n");
 
-		if (focusPairs != null && !focusPairs.isEmpty()) {
+		if (target.hasPairs()) {
 			prompt.append("The typist hesitates on these key transitions; ")
 					.append("include them naturally and more than once: ")
-					.append(String.join(", ", focusPairs)).append('\n');
+					.append(String.join(", ", target.pairs())).append('\n');
+		}
+		else if (target.finger() != null) {
+			String keys = String.join("",
+					FocusedDrillBuilder.allowedKeys(tier, target.finger()));
+			if (!keys.isEmpty()) {
+				prompt.append("Their ").append(target.finger().label().toLowerCase())
+						.append(" is the least steady reach; include these keys it types ")
+						.append("naturally and more than once: ").append(keys).append('\n');
+			}
 		}
 		if (exclude != null && !exclude.isBlank()) {
 			prompt.append("Do not repeat this drill: ").append(exclude).append('\n');

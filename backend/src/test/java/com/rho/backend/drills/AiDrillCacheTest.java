@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.rho.backend.analysis.Finger;
+
 import org.junit.jupiter.api.Test;
 
 import reactor.core.publisher.Mono;
@@ -132,6 +134,29 @@ class AiDrillCacheTest {
 				.isEqualTo(AiDrillCache.cacheKey(2, List.of("m,", "bn")));
 		assertThat(AiDrillCache.cacheKey(2, List.of("bn")))
 				.isNotEqualTo(AiDrillCache.cacheKey(2, List.of()));
+	}
+
+	@Test
+	void fingerFocusKeepsItsOwnQueue() {
+		DrillFocus leftRing = new DrillFocus(List.of(), Finger.LEFT_RING);
+		DrillFocus rightIndex = new DrillFocus(List.of(), Finger.RIGHT_INDEX);
+		AiDrillCache cache = cache(
+				generator(staticDrills.toArray(String[]::new)), properties(2, 60));
+
+		cache.refill(homeRow, leftRing, null);
+
+		assertThat(cache.take(0, rightIndex, null)).isEmpty();
+		assertThat(cache.take(0, leftRing, null)).contains(staticDrills.get(0));
+	}
+
+	@Test
+	void fingerSignatureIsDistinctFromPairsAlone() {
+		DrillFocus leftRing = new DrillFocus(List.of(), Finger.LEFT_RING);
+		DrillFocus rightIndex = new DrillFocus(List.of(), Finger.RIGHT_INDEX);
+
+		assertThat(AiDrillCache.cacheKey(0, leftRing))
+				.isNotEqualTo(AiDrillCache.cacheKey(0, DrillFocus.none()))
+				.isNotEqualTo(AiDrillCache.cacheKey(0, rightIndex));
 	}
 
 	private AiDrillCache cache(DrillGenerator generator, AiDrillProperties properties) {

@@ -1,9 +1,9 @@
 package com.rho.backend.drills;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.rho.backend.analysis.FingerStatService;
 import com.rho.backend.analysis.WeakPairService;
 import com.rho.backend.progress.TierProgressService;
 
@@ -22,6 +22,7 @@ public class DrillService {
 	private final AiDrillCache aiDrills;
 	private final TierProgressService progress;
 	private final WeakPairService weakPairs;
+	private final FingerStatService fingers;
 
 	public DrillService(
 			TierCatalogue catalogue,
@@ -29,13 +30,15 @@ public class DrillService {
 			DrillValidator validator,
 			AiDrillCache aiDrills,
 			TierProgressService progress,
-			WeakPairService weakPairs) {
+			WeakPairService weakPairs,
+			FingerStatService fingers) {
 		this.catalogue = catalogue;
 		this.pool = pool;
 		this.validator = validator;
 		this.aiDrills = aiDrills;
 		this.progress = progress;
 		this.weakPairs = weakPairs;
+		this.fingers = fingers;
 	}
 
 	public Mono<DrillResponse> next(UUID userId, int tier, String exclude) {
@@ -49,15 +52,23 @@ public class DrillService {
 									HttpStatus.FORBIDDEN, "Tier " + tier + " is locked"));
 						}
 
-						return weakPairs.focus(userId, tier)
-								.defaultIfEmpty(List.of())
-								.flatMap(focus -> serve(definition, focus, exclude));
+						return Mono.zip(
+										weakPairs.focus(userId, tier),
+										fingers.focus(userId, tier))
+								.flatMap(focus -> serve(
+										definition,
+										new DrillFocus(
+												focus.getT1(),
+												focus.getT1().isEmpty()
+														? focus.getT2().orElse(null)
+														: null),
+										exclude));
 					});
 		});
 	}
 
 	private Mono<DrillResponse> serve(
-			TierDefinition definition, List<String> focus, String exclude) {
+			TierDefinition definition, DrillFocus focus, String exclude) {
 		Optional<String> generated = aiDrills.take(definition.tier(), focus, exclude)
 				.filter(candidate -> validator.isValid(candidate, definition));
 

@@ -3,6 +3,8 @@ package com.rho.backend.drills;
 import java.util.List;
 import java.util.Map;
 
+import com.rho.backend.analysis.Finger;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,5 +63,46 @@ class FocusedDrillBuilderTest {
 		assertThat(FocusedDrillBuilder.build(homeRow, List.of(), null)).isNull();
 		assertThat(FocusedDrillBuilder.build(homeRow, null, null)).isNull();
 		assertThat(FocusedDrillBuilder.build(homeRow, List.of("zz", "a"), null)).isNull();
+	}
+
+	@Test
+	void buildsAValidDrillFromOneWeakFingerForEveryTier() {
+		Map<Integer, Finger> fingers = Map.of(
+				0, Finger.LEFT_PINKY,
+				1, Finger.LEFT_RING,
+				2, Finger.RIGHT_MIDDLE,
+				3, Finger.RIGHT_PINKY,
+				4, Finger.RIGHT_RING);
+
+		fingers.forEach((tierId, finger) -> {
+			TierDefinition tier = catalogue.require(tierId);
+			String drill = FocusedDrillBuilder.buildForFinger(tier, finger, null);
+
+			assertThat(drill).as("tier %d", tierId).isNotNull();
+			assertThat(validator.validate(drill, tier))
+					.as("tier %d drill %s", tierId, drill)
+					.isEmpty();
+			assertThat(drill.chars())
+					.anyMatch(character -> finger.baseKeys().indexOf(character) >= 0);
+		});
+	}
+
+	@Test
+	void aFingerRetryGetsADifferentText() {
+		TierDefinition punctuation = catalogue.require(3);
+
+		String first = FocusedDrillBuilder.buildForFinger(
+				punctuation, Finger.RIGHT_PINKY, null);
+		String second = FocusedDrillBuilder.buildForFinger(
+				punctuation, Finger.RIGHT_PINKY, first);
+
+		assertThat(second).isNotNull().isNotEqualTo(first);
+		assertThat(validator.validate(second, punctuation)).isEmpty();
+	}
+
+	@Test
+	void aFingerWithNoKeysInTheTierYieldsNoDrill() {
+		assertThat(FocusedDrillBuilder.buildForFinger(
+				catalogue.require(0), Finger.THUMBS, null)).isNull();
 	}
 }

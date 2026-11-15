@@ -64,6 +64,32 @@ class FingerStatServiceTest {
 				new FingerReport.Entry("LEFT_RING", "Left ring", 4, 4, 0, 300, 0.55));
 	}
 
+	@Test
+	void focusPicksTheWeakestRepeatedReach() {
+		when(repository.findByUserAndTier(USER_ID, 0)).thenReturn(Flux.just(
+				new FingerStat(Finger.LEFT_PINKY, 4, 0, 0, 400),
+				new FingerStat(Finger.RIGHT_RING, 4, 4, 0, 1_200),
+				new FingerStat(Finger.LEFT_RING, 1, 1, 0, 1_200)));
+
+		assertThat(service().focus(USER_ID, 0).block()).contains(Finger.RIGHT_RING);
+	}
+
+	@Test
+	void focusIgnoresAReachBelowTheScoreFloor() {
+		when(repository.findByUserAndTier(USER_ID, 0)).thenReturn(Flux.just(
+				new FingerStat(Finger.LEFT_PINKY, 10, 0, 0, 250)));
+
+		assertThat(service().focus(USER_ID, 0).block()).isEmpty();
+	}
+
+	@Test
+	void aFailingReadLeavesDrillsUntargeted() {
+		when(repository.findByUserAndTier(USER_ID, 0))
+				.thenReturn(Flux.error(new IllegalStateException("analysis unavailable")));
+
+		assertThat(service().focus(USER_ID, 0).block()).isEmpty();
+	}
+
 	private FingerStatService service() {
 		return new FingerStatService(repository);
 	}

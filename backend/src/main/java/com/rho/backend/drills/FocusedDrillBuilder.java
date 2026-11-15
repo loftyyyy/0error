@@ -1,15 +1,18 @@
 package com.rho.backend.drills;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+import com.rho.backend.analysis.Finger;
+
 /**
- * Builds an offline drill from the transitions a typist needs to practise. It
- * is only used when no curated drill covers a focus pair, so the adaptive loop
+ * Builds an offline drill from what a typist needs to practise. It is only used
+ * when no curated drill covers a focus pair or reach, so the adaptive loop
  * still works without the AI generator.
  *
- * <p>Output is deterministic: focus pairs first, then repeats with a short
+ * <p>Output is deterministic: target material first, then repeats with a short
  * base-row token every few slots to avoid a wall of one bigram.
  */
 final class FocusedDrillBuilder {
@@ -37,6 +40,28 @@ final class FocusedDrillBuilder {
 		return plain.equals(exclude) ? null : plain;
 	}
 
+	/**
+	 * Returns a drill built only from the keys one finger reaches. Null when
+	 * the tier allows none of them, for example the thumbs on a letter tier.
+	 */
+	static String buildForFinger(TierDefinition tier, Finger finger, String exclude) {
+		List<String> keys = allowedKeys(tier, finger);
+		if (keys.isEmpty()) {
+			return null;
+		}
+
+		List<String> tokens = adjacentTokens(keys);
+		String forward = compose(tier, tokens, false);
+		if (!forward.equals(exclude)) {
+			return forward;
+		}
+
+		List<String> reversed = new ArrayList<>(tokens);
+		Collections.reverse(reversed);
+		String backward = compose(tier, reversed, false);
+		return backward.equals(exclude) ? null : backward;
+	}
+
 	private static List<String> sanitize(TierDefinition tier, List<String> focusPairs) {
 		if (focusPairs == null) {
 			return List.of();
@@ -58,24 +83,46 @@ final class FocusedDrillBuilder {
 		return List.copyOf(unique);
 	}
 
-	private static String compose(TierDefinition tier, List<String> pairs, boolean breakMonotony) {
-		List<String> tokens = new ArrayList<>(pairs);
-		int length = joinedLength(tokens);
-		int nextPair = 0;
+	static List<String> allowedKeys(TierDefinition tier, Finger finger) {		LinkedHashSet<String> keys = new LinkedHashSet<>();
+		for (char key : finger.baseKeys().toCharArray()) {
+			// A space-only drill would not teach the reach itself.
+			if (key != ' ' && tier.allows(key)) {
+				keys.add(String.valueOf(key));
+			}
+		}
+		return List.copyOf(keys);
+	}
+
+	private static List<String> adjacentTokens(List<String> keys) {
+		if (keys.size() == 1) {
+			return List.of(keys.get(0) + keys.get(0));
+		}
+
+		List<String> tokens = new ArrayList<>(keys.size());
+		for (int index = 0; index < keys.size(); index++) {
+			tokens.add(keys.get(index) + keys.get((index + 1) % keys.size()));
+		}
+		return tokens;
+	}
+
+	private static String compose(TierDefinition tier, List<String> tokens, boolean breakMonotony) {
+		List<String> built = new ArrayList<>(tokens);
+		int length = joinedLength(built);
+		int next = 0;
 
 		while (length < tier.minLength()) {
-			boolean useBase = breakMonotony && tokens.size() % BASE_TOKEN_INTERVAL == BASE_TOKEN_INTERVAL - 1;
-			String token = useBase ? baseToken(tier) : pairs.get(nextPair++ % pairs.size());
-			tokens.add(token);
+			boolean useBase = breakMonotony && built.size() % BASE_TOKEN_INTERVAL == BASE_TOKEN_INTERVAL - 1;
+			String token = useBase ? baseToken(tier) : tokens.get(next++ % tokens.size());
+			built.add(token);
 			length += token.length() + 1;
 		}
 
-		while (length > tier.maxLength() && tokens.size() > 1) {
-			String removed = tokens.remove(tokens.size() - 1);
+		while (length > tier.maxLength() && built.size() > 1) {
+			String removed = built.remove(built.size() - 1);
 			length -= removed.length() + 1;
 		}
 
-		return String.join(" ", tokens);
+		return String.join(" ", built);
 	}
 
 	private static int joinedLength(List<String> tokens) {

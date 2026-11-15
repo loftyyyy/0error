@@ -10,6 +10,8 @@ import java.util.Map;
  */
 final class FingerMap {
 
+	private static final Map<Character, Character> SHIFTED = shifted();
+
 	private static final Map<Character, Finger> BY_CHARACTER = build();
 
 	private FingerMap() {
@@ -24,24 +26,48 @@ final class FingerMap {
 
 	private static Map<Character, Finger> build() {
 		Map<Character, Finger> map = new HashMap<>();
-		assign(map, Finger.LEFT_PINKY, "`~1!qQaAzZ");
-		assign(map, Finger.LEFT_RING, "2@wWsSxX");
-		assign(map, Finger.LEFT_MIDDLE, "3#eEdDcC");
-		assign(map, Finger.LEFT_INDEX, "4$5%rRtTfFgGvVbB");
-		assign(map, Finger.THUMBS, " ");
-		assign(map, Finger.RIGHT_INDEX, "6^7&yYuUhHjJnNmM");
-		assign(map, Finger.RIGHT_MIDDLE, "8*iIkK,<");
-		assign(map, Finger.RIGHT_RING, "9(oOlL.>");
-		assign(map, Finger.RIGHT_PINKY, "0)pP;:/?-_[{=+]}\\\"'");
+		for (Finger finger : Finger.values()) {
+			for (char base : finger.baseKeys().toCharArray()) {
+				assign(map, base, finger);
+				if (Character.isLetter(base)) {
+					assign(map, Character.toUpperCase(base), finger);
+				}
+			}
+		}
+		SHIFTED.forEach((shifted, base) -> assign(map, shifted, map.get(base)));
 		return Map.copyOf(map);
 	}
 
-	private static void assign(Map<Character, Finger> map, Finger finger, String characters) {
-		for (char character : characters.toCharArray()) {
-			Finger previous = map.put(character, finger);
-			if (previous != null) {
-				throw new IllegalStateException("Character '" + character + "' has two fingers");
-			}
+	private static void assign(Map<Character, Finger> map, char character, Finger finger) {
+		Finger previous = map.put(character, finger);
+		if (previous != null) {
+			throw new IllegalStateException("Character '" + character + "' has two fingers");
 		}
+	}
+
+	/** Shifted symbols paired with the key they sit above. */
+	private static Map<Character, Character> shifted() {
+		return Map.ofEntries(
+				Map.entry('~', '`'),
+				Map.entry('!', '1'),
+				Map.entry('@', '2'),
+				Map.entry('#', '3'),
+				Map.entry('$', '4'),
+				Map.entry('%', '5'),
+				Map.entry('^', '6'),
+				Map.entry('&', '7'),
+				Map.entry('*', '8'),
+				Map.entry('(', '9'),
+				Map.entry(')', '0'),
+				Map.entry('_', '-'),
+				Map.entry('+', '='),
+				Map.entry('{', '['),
+				Map.entry('}', ']'),
+				Map.entry('|', '\\'),
+				Map.entry(':', ';'),
+				Map.entry('"', '\''),
+				Map.entry('<', ','),
+				Map.entry('>', '.'),
+				Map.entry('?', '/'));
 	}
 }
