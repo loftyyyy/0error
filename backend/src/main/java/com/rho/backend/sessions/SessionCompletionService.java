@@ -2,6 +2,7 @@ package com.rho.backend.sessions;
 
 import java.util.UUID;
 
+import com.rho.backend.analysis.FingerStatService;
 import com.rho.backend.analysis.WeakPairService;
 import com.rho.backend.progress.GateOutcome;
 import com.rho.backend.progress.TierProgressService;
@@ -29,6 +30,7 @@ public class SessionCompletionService {
 	private final SessionMetricsService metrics;
 	private final TierProgressService progress;
 	private final WeakPairService weakPairs;
+	private final FingerStatService fingers;
 	private final KeystrokeEventRepository keystrokes;
 	private final DatabaseClient databaseClient;
 
@@ -37,12 +39,14 @@ public class SessionCompletionService {
 			SessionMetricsService metrics,
 			TierProgressService progress,
 			WeakPairService weakPairs,
+			FingerStatService fingers,
 			KeystrokeEventRepository keystrokes,
 			DatabaseClient databaseClient) {
 		this.sessions = sessions;
 		this.metrics = metrics;
 		this.progress = progress;
 		this.weakPairs = weakPairs;
+		this.fingers = fingers;
 		this.keystrokes = keystrokes;
 		this.databaseClient = databaseClient;
 	}
@@ -65,6 +69,8 @@ public class SessionCompletionService {
 											.applyCompletion(userId, session.tier(), aggregates)
 											.flatMap(outcome -> weakPairs
 													.recordSession(userId, session.tier(), rawEvents)
+													.then(fingers.recordSession(
+															userId, session.tier(), rawEvents))
 													.then(markCompleted(sessionId))
 													.thenReturn(toResponse(
 															sessionId, session.tier(), aggregates, outcome)))));

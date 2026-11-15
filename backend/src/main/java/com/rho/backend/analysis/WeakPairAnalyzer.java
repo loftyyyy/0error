@@ -5,10 +5,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import com.rho.backend.telemetry.KeystrokeEvent;
-import com.rho.backend.telemetry.RawKeystroke;
 
 /**
  * Turns one session's raw keystrokes into ordered-pair aggregates. Pure, so the
@@ -25,24 +23,14 @@ public final class WeakPairAnalyzer {
 	}
 
 	public static List<WeakPair> analyze(List<KeystrokeEvent> events) {
-		Map<Integer, KeystrokeEvent> firstAttempts = new TreeMap<>();
-		for (KeystrokeEvent event : events) {
-			if (!RawKeystroke.KEY.equals(event.kind()) || event.warmup()) {
-				continue;
-			}
-			// Keep the earliest sequence for each position.
-			firstAttempts.merge(event.position(), event,
-					(kept, candidate) -> kept.seq() <= candidate.seq() ? kept : candidate);
-		}
-
 		Map<String, Counts> byPair = new LinkedHashMap<>();
 		KeystrokeEvent previous = null;
 
-		for (KeystrokeEvent current : firstAttempts.values()) {
+		for (KeystrokeEvent current : Attempts.firstAttempts(events)) {
 			if (previous != null && current.position() == previous.position() + 1) {
 				String first = previous.expectedChar();
 				String second = current.expectedChar();
-				if (isPrintableCharacter(first) && isPrintableCharacter(second)) {
+				if (Attempts.isPrintableCharacter(first) && Attempts.isPrintableCharacter(second)) {
 					Counts counts = byPair.computeIfAbsent(first + second,
 							key -> new Counts(first, second));
 					counts.add(current);
@@ -57,15 +45,6 @@ public final class WeakPairAnalyzer {
 		}
 		result.sort(Comparator.comparing(WeakPair::pair));
 		return result;
-	}
-
-	private static boolean isPrintableCharacter(String value) {
-		if (value == null || value.length() != 1) {
-			return false;
-		}
-		char character = value.charAt(0);
-		// Matches the independent printable-ASCII guard in the weak_pairs schema.
-		return character >= 0x20 && character <= 0x7E;
 	}
 
 	private static final class Counts {
@@ -89,7 +68,7 @@ public final class WeakPairAnalyzer {
 			}
 			if (secondKey.displayMs() != null) {
 				totalDisplayMs += secondKey.displayMs();
-				if (secondKey.displayMs() > WeakPair.SLOW_GAP_MS) {
+				if (secondKey.displayMs() > Weakness.SLOW_GAP_MS) {
 					pauses += 1;
 				}
 			}

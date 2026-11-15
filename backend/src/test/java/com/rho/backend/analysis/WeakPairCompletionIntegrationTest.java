@@ -47,6 +47,9 @@ class WeakPairCompletionIntegrationTest {
 
 			assertPair(userId, "d", "k", 1, 1, 1, 1_000);
 			assertPair(userId, "k", "s", 1, 0, 0, 100);
+			assertFinger(userId, Finger.LEFT_MIDDLE, 1, 0, 0, 100);
+			assertFinger(userId, Finger.RIGHT_MIDDLE, 1, 1, 1, 1_000);
+			assertFinger(userId, Finger.LEFT_RING, 1, 0, 0, 100);
 
 			StepVerifier.create(completion.complete(userId, sessionId))
 					.expectErrorSatisfies(error -> {
@@ -57,6 +60,7 @@ class WeakPairCompletionIntegrationTest {
 					.verify();
 
 			assertPair(userId, "d", "k", 1, 1, 1, 1_000);
+			assertFinger(userId, Finger.RIGHT_MIDDLE, 1, 1, 1, 1_000);
 		}
 		finally {
 			databaseClient.sql("DELETE FROM users WHERE id = :id")
@@ -96,6 +100,33 @@ class WeakPairCompletionIntegrationTest {
 
 		assertThat(pair).isEqualTo(
 				new WeakPair(first, second, attempts, errors, pauses, totalDisplayMs));
+	}
+
+	private void assertFinger(
+			UUID userId,
+			Finger finger,
+			int attempts,
+			int errors,
+			int pauses,
+			long totalDisplayMs) {
+		FingerStat stat = databaseClient.sql("""
+						SELECT attempts, errors, pauses, total_display_ms
+						FROM finger_stats
+						WHERE user_id = :userId AND tier = 0 AND finger = :finger
+						""")
+				.bind("userId", userId)
+				.bind("finger", finger.name())
+				.map((row, metadata) -> new FingerStat(
+						finger,
+						row.get("attempts", Integer.class),
+						row.get("errors", Integer.class),
+						row.get("pauses", Integer.class),
+						row.get("total_display_ms", Long.class)))
+				.one()
+				.block();
+
+		assertThat(stat).isEqualTo(
+				new FingerStat(finger, attempts, errors, pauses, totalDisplayMs));
 	}
 
 	private void insertUser(UUID userId) {

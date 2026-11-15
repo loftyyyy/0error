@@ -14,10 +14,7 @@ public record WeakPair(
 		long totalDisplayMs) {
 
 	/** Timing above this is treated as friction on the transition. */
-	public static final int SLOW_GAP_MS = 900;
-
-	private static final double LATENCY_FLOOR_MS = 300.0;
-	private static final double LATENCY_RANGE_MS = 1200.0;
+	public static final int SLOW_GAP_MS = Weakness.SLOW_GAP_MS;
 
 	public String pair() {
 		return first + second;
@@ -40,8 +37,6 @@ public record WeakPair(
 	 * visible pauses, then a slow but accurate transition.
 	 */
 	public double score() {
-		double latency = Math.min(1.0,
-				Math.max(0.0, (meanDisplayMs() - LATENCY_FLOOR_MS) / LATENCY_RANGE_MS));
-		return 0.55 * errorRate() + 0.30 * pauseRate() + 0.15 * latency;
+		return Weakness.score(attempts, errors, pauses, meanDisplayMs());
 	}
 }
