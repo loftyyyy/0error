@@ -3,6 +3,7 @@ import { ArrowRight, RotateCcw } from 'lucide-react'
 
 import { fetchDrillSet } from './features/drills/drillApi'
 import { streamFeedback } from './features/feedback/feedbackApi'
+import { FingerNote } from './features/progress/FingerNote'
 import { FocusNote } from './features/progress/FocusNote'
 import { activeTier, fetchProgress } from './features/progress/progressApi'
 import { completeServerSession, createServerSession } from './features/sessions/sessionApi'
@@ -351,6 +352,7 @@ function ResultPanel({
 
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote tier={result.tier} />
+      <FingerNote tier={result.tier} />
 
       <button
         type="button"
