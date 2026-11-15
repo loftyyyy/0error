@@ -16,7 +16,7 @@ class AiDrillCacheTest {
 	private final TierCatalogue catalogue = new TierCatalogue();
 	private final DrillValidator validator = new DrillValidator();
 	private final TierDefinition homeRow = catalogue.require(0);
-	private final List<String> staticDrills = new ArrayList<>(new StaticDrillPool().forTier(0));
+	private final List<String> staticDrills = new ArrayList<>(new StaticDrillPool(new TierCatalogue()).forTier(0));
 
 	@Test
 	void servesAValidatedGeneratedDrill() {

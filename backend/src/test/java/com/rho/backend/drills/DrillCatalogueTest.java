@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DrillCatalogueTest {
 
 	private final TierCatalogue catalogue = new TierCatalogue();
-	private final StaticDrillPool pool = new StaticDrillPool();
+	private final StaticDrillPool pool = new StaticDrillPool(catalogue);
 	private final DrillValidator validator = new DrillValidator();
 
 	@Test

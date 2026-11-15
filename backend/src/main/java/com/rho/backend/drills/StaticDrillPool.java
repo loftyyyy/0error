@@ -35,6 +35,12 @@ public class StaticDrillPool {
 					"Small steps build speed; accuracy comes before velocity.",
 					"Keep your fingers on the home row and let the words flow."));
 
+	private final TierCatalogue catalogue;
+
+	public StaticDrillPool(TierCatalogue catalogue) {
+		this.catalogue = catalogue;
+	}
+
 	public List<String> forTier(int tier) {
 		return DRILLS.getOrDefault(tier, List.of());
 	}
@@ -45,8 +51,9 @@ public class StaticDrillPool {
 	}
 
 	/**
-	 * Picks a drill, preferring one that contains a focus pair. When no
-	 * candidate covers a weak transition, the ordinary pool still answers.
+	 * Picks a drill, preferring one that contains a focus pair. When the
+	 * curated pool cannot cover a weak transition, a small drill is composed
+	 * from the focus pairs themselves.
 	 */
 	public String pick(int tier, List<String> focusPairs, String exclude) {
 		List<String> candidates = forTier(tier);
@@ -59,11 +66,18 @@ public class StaticDrillPool {
 				.toList();
 		List<String> pool = filtered.isEmpty() ? candidates : filtered;
 
-		List<String> targeted = pool.stream()
-				.filter(candidate -> containsAny(candidate, focusPairs))
-				.toList();
-		if (!targeted.isEmpty()) {
-			pool = targeted;
+		if (focusPairs != null && !focusPairs.isEmpty()) {
+			List<String> targeted = pool.stream()
+					.filter(candidate -> containsAny(candidate, focusPairs))
+					.toList();
+			if (!targeted.isEmpty()) {
+				pool = targeted;
+			} else {
+				String built = FocusedDrillBuilder.build(catalogue.require(tier), focusPairs, exclude);
+				if (built != null) {
+					return built;
+				}
+			}
 		}
 
 		return pool.get(ThreadLocalRandom.current().nextInt(pool.size()));

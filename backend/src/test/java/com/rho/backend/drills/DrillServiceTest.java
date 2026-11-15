@@ -138,7 +138,7 @@ class DrillServiceTest {
 	private DrillService service() {
 		return new DrillService(
 				new TierCatalogue(),
-				new StaticDrillPool(),
+				new StaticDrillPool(new TierCatalogue()),
 				new DrillValidator(),
 				aiDrills,
 				progress,
