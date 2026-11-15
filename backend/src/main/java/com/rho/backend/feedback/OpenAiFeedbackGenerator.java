@@ -46,8 +46,8 @@ public class OpenAiFeedbackGenerator implements FeedbackGenerator {
 				.subscribeOn(Schedulers.boundedElastic());
 	}
 
-	private static String userPrompt(FeedbackContext context) {
-		return """
+	static String userPrompt(FeedbackContext context) {
+		StringBuilder prompt = new StringBuilder("""
 				Tier: %s
 				Keystrokes: %d
 				Correct first attempts: %d
@@ -62,6 +62,16 @@ public class OpenAiFeedbackGenerator implements FeedbackGenerator {
 				context.accuracy() == null ? "unknown" : context.accuracy() + "%",
 				context.medianInterKeyMs() == null ? "unknown" : context.medianInterKeyMs() + " ms",
 				context.p95InterKeyMs() == null ? "unknown" : context.p95InterKeyMs() + " ms",
-				context.hesitationCount());
+				context.hesitationCount()));
+
+		if (!context.focusPairs().isEmpty()) {
+			prompt.append("Weak transitions: ")
+					.append(String.join(", ", context.focusPairs()))
+					.append('\n');
+		}
+		if (context.weakReach() != null && !context.weakReach().isBlank()) {
+			prompt.append("Least steady reach: ").append(context.weakReach()).append('\n');
+		}
+		return prompt.toString();
 	}
 }

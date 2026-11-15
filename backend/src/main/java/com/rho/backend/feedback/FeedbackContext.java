@@ -1,6 +1,7 @@
 package com.rho.backend.feedback;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /** Performance facts a coach may mention. Nothing raw or personally identifying. */
 public record FeedbackContext(
@@ -11,5 +12,7 @@ public record FeedbackContext(
 		BigDecimal accuracy,
 		Integer medianInterKeyMs,
 		Integer p95InterKeyMs,
-		int hesitationCount) {
+		int hesitationCount,
+		List<String> focusPairs,
+		String weakReach) {
 }

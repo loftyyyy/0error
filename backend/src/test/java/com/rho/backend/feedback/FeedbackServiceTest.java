@@ -2,13 +2,19 @@ package com.rho.backend.feedback;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import com.rho.backend.analysis.Finger;
+import com.rho.backend.analysis.FingerStatService;
+import com.rho.backend.analysis.WeakPairService;
 import com.rho.backend.drills.TierCatalogue;
 import com.rho.backend.sessions.TypingSession;
 import com.rho.backend.sessions.TypingSessionRepository;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,7 +24,9 @@ import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FeedbackServiceTest {
@@ -27,11 +35,14 @@ class FeedbackServiceTest {
 	private static final UUID SESSION_ID = UUID.randomUUID();
 
 	private final TypingSessionRepository sessions = mock(TypingSessionRepository.class);
+	private final WeakPairService weakPairs = mock(WeakPairService.class);
+	private final FingerStatService fingers = mock(FingerStatService.class);
 	private final FeedbackGenerator generator = mock(FeedbackGenerator.class);
 
 	@Test
 	void streamsGeneratedTokensForACompletedSession() {
 		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session("COMPLETED")));
+		stubNoFocus();
 		when(generator.stream(any())).thenReturn(Flux.just("Nice rhythm.", " Keep it."));
 
 		StepVerifier.create(service().stream(USER_ID, SESSION_ID))
@@ -42,6 +53,7 @@ class FeedbackServiceTest {
 	@Test
 	void emptyGeneratorFallsBackToDeterministicCoaching() {
 		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session("COMPLETED")));
+		stubNoFocus();
 		when(generator.stream(any())).thenReturn(Flux.empty());
 
 		StepVerifier.create(service().stream(USER_ID, SESSION_ID))
@@ -52,11 +64,30 @@ class FeedbackServiceTest {
 	@Test
 	void generatorErrorEndsWithTheClosingLine() {
 		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session("COMPLETED")));
+		stubNoFocus();
 		when(generator.stream(any())).thenReturn(Flux.error(new IllegalStateException("boom")));
 
 		StepVerifier.create(service().stream(USER_ID, SESSION_ID))
 				.expectNext(" " + FallbackFeedback.closingLine())
 				.verifyComplete();
+	}
+
+	@Test
+	void focusReachesTheCoachContext() {
+		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session("COMPLETED")));
+		when(weakPairs.focus(USER_ID, 0)).thenReturn(Mono.just(List.of("as", "df")));
+		when(fingers.focus(USER_ID, 0))
+				.thenReturn(Mono.just(Optional.of(Finger.RIGHT_RING)));
+		when(generator.stream(any())).thenReturn(Flux.just("Nice rhythm."));
+
+		StepVerifier.create(service().stream(USER_ID, SESSION_ID))
+				.expectNext("Nice rhythm.")
+				.verifyComplete();
+
+		ArgumentCaptor<FeedbackContext> context = ArgumentCaptor.forClass(FeedbackContext.class);
+		verify(generator).stream(context.capture());
+		assertThat(context.getValue().focusPairs()).containsExactly("as", "df");
+		assertThat(context.getValue().weakReach()).isEqualTo("Right ring (l)");
 	}
 
 	@Test
@@ -86,12 +117,18 @@ class FeedbackServiceTest {
 	}
 
 	private FeedbackService service() {
-		return new FeedbackService(sessions, new TierCatalogue(), generator);
+		return new FeedbackService(sessions, new TierCatalogue(), weakPairs, fingers, generator);
+	}
+
+	private void stubNoFocus() {
+		when(weakPairs.focus(any(), anyInt())).thenReturn(Mono.just(List.of()));
+		when(fingers.focus(any(), anyInt())).thenReturn(Mono.just(Optional.empty()));
 	}
 
 	private static FeedbackContext context() {
 		return new FeedbackContext(
-				0, "Home row", 140, 138, new BigDecimal("98.57"), 280, 620, 0);
+				0, "Home row", 140, 138, new BigDecimal("98.57"), 280, 620, 0,
+				List.of(), null);
 	}
 
 	private static TypingSession session(String status) {
