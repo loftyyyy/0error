@@ -10,6 +10,7 @@ import com.rho.backend.sessions.TypingSessionRepository;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +23,7 @@ import reactor.test.StepVerifier;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -81,6 +83,32 @@ class TelemetryIngestServiceTest {
 					assertThat(response.duplicates()).isEqualTo(2);
 				})
 				.verifyComplete();
+	}
+
+	@Test
+	void clientCorrectnessFlagIsIgnored() {
+		givenOwnedSession();
+		when(writer.insertIgnoringDuplicates(any(), anyList())).thenReturn(Mono.just(4));
+		when(metrics.recompute(SESSION_ID)).thenReturn(Mono.just(new SessionMetrics(
+				4, 1, new java.math.BigDecimal("25.00"), 100, 100, 0)));
+
+		List<RawKeystroke> sent = List.of(
+				new RawKeystroke(0, 0, RawKeystroke.KEY, "a", "s", true, 0, 100, false),
+				new RawKeystroke(1, 1, RawKeystroke.KEY, "b", "b", false, 100, 100, false),
+				new RawKeystroke(2, 1, RawKeystroke.BACKSPACE, "b", null, false, 200, null, false),
+				new RawKeystroke(3, 2, RawKeystroke.KEY, null, "x", true, 300, 100, false));
+
+		StepVerifier.create(service.ingest(USER_ID, SESSION_ID,
+						new TelemetryBatchRequest("b", SESSION_ID, Instant.now(), sent)))
+				.assertNext(response -> assertThat(response.inserted()).isEqualTo(4))
+				.verifyComplete();
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<RawKeystroke>> stored = ArgumentCaptor.forClass(List.class);
+		verify(writer).insertIgnoringDuplicates(eq(SESSION_ID), stored.capture());
+		assertThat(stored.getValue())
+				.extracting(RawKeystroke::correct)
+				.containsExactly(false, true, true, false);
 	}
 
 	@Test

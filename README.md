@@ -202,7 +202,8 @@ frontend/
   supplying `X-Guest-Id` and `X-Guest-Token` to the guest endpoint rotates that
   same guest's token.
 - The server stores single expected/actual characters per keystroke, never the
-  typed text, and never trusts client-calculated aggregates.
+  typed text. It re-derives each keystroke's correctness from those characters
+  and never trusts client-calculated aggregates.
 - Without `OPENAI_API_KEY` the app is fully functional: drills come from the
   static pool and coaching from the deterministic fallback.
 - Redis is wired into `docker-compose.yml` for future caching but no code uses
