@@ -179,6 +179,10 @@ npm test
 npm run build
 ```
 
+Most frontend tests are pure functions rendered to static markup. The keystroke
+capture and hesitation tests run in jsdom and dispatch real `keydown`, `blur`,
+and `paste` events, so the window wiring is covered without a browser.
+
 ## Project layout
 
 ```text
