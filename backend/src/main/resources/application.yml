@@ -62,6 +62,11 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    redis:
+      # Redis is provisioned for later caching, but no application code uses it
+      # yet. An unused dependency must not turn the liveness probe red.
+      enabled: false
 
 app:
   cors:
