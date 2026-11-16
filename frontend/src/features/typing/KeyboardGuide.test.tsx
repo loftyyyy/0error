@@ -31,14 +31,39 @@ describe('keyForCharacter', () => {
 })
 
 describe('KeyboardGuide', () => {
-  it('lights exactly the target key once a hesitation is shown', () => {
+  it('names the key, the shift, and the finger once a hesitation is shown', () => {
     const markup = renderToStaticMarkup(
       <KeyboardGuide character=":" hesitating visible />,
     )
 
     expect(markup).toContain('Hold shift')
+    expect(markup).toContain('Right pinky finger')
     expect(markup.match(/fill-stone-900/g)).toHaveLength(1)
-    expect(markup).toContain('aria-label="Keyboard hint: press ; with Shift"')
+    expect(markup).toContain(
+      'aria-label="Keyboard hint: press ; with your right pinky finger and Shift"',
+    )
+  })
+
+  it('names the finger for a plain letter', () => {
+    const markup = renderToStaticMarkup(
+      <KeyboardGuide character="f" hesitating visible />,
+    )
+
+    expect(markup).toContain('Left index finger')
+    expect(markup).toContain(
+      'aria-label="Keyboard hint: press f with your left index finger"',
+    )
+  })
+
+  it('says thumbs for the space bar', () => {
+    const markup = renderToStaticMarkup(
+      <KeyboardGuide character=" " hesitating visible />,
+    )
+
+    expect(markup).toContain('Thumbs')
+    expect(markup).toContain(
+      'aria-label="Keyboard hint: press space with your thumbs"',
+    )
   })
 
   it('stays unlit and quiet while the rhythm holds', () => {
@@ -47,7 +72,7 @@ describe('KeyboardGuide', () => {
     )
 
     expect(markup).not.toContain('fill-stone-900')
-    expect(markup).not.toContain('Hold shift')
+    expect(markup).not.toMatch(/finger|Hold shift/)
     expect(markup).toContain('aria-label="Keyboard guide"')
   })
 })

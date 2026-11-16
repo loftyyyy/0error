@@ -3,7 +3,8 @@
  * up the next key only after a hesitation, so it never competes with the text.
  */
 
-import { keyForCharacter } from './keyboardLayout'
+import { fingerForBase, fingerHint } from './fingerMap'
+import { keyForCharacter, KEYBOARD_ROWS } from './keyboardLayout'
 
 export interface KeyboardGuideProps {
   /** The next character in the drill; null when the drill is over. */
@@ -11,13 +12,6 @@ export interface KeyboardGuideProps {
   hesitating: boolean
   visible?: boolean
 }
-
-const ROWS: string[][] = [
-  '1234567890-='.split(''),
-  'qwertyuiop[]'.split(''),
-  "asdfjkl;'".split(''),
-  'zxcvbnm,./'.split(''),
-]
 
 /** Physical row offsets give the keyboard its familiar stagger. */
 const ROW_OFFSETS = [0, 8, 20, 34]
@@ -36,10 +30,17 @@ export function KeyboardGuide({
 }: KeyboardGuideProps) {
   const target = keyForCharacter(character)
   const highlight = hesitating ? target : null
+  const finger = highlight ? fingerForBase(highlight.base) : null
+  const fingerLabel =
+    finger === null ? null : finger === 'Thumbs' ? 'Thumbs' : `${finger} finger`
+  const hint = fingerHint(finger)
+  const hintParts = [fingerLabel, highlight?.shift ? 'Hold shift' : null].filter(
+    (part): part is string => part !== null,
+  )
   const label = highlight
     ? `Keyboard hint: press ${highlight.base === ' ' ? 'space' : highlight.base}${
-        highlight.shift ? ' with Shift' : ''
-      }`
+        hint ? ` ${hint}` : ''
+      }${highlight.shift ? ' and Shift' : ''}`
     : 'Keyboard guide'
 
   const keyClass = (active: boolean) =>
@@ -63,7 +64,7 @@ export function KeyboardGuide({
         aria-label={label}
         className="w-full max-w-[30rem] select-none"
       >
-        {ROWS.map((row, rowIndex) => (
+        {KEYBOARD_ROWS.map((row, rowIndex) => (
           <g key={row.join('')}>
             {row.map((base, index) => {
               const x = ROW_OFFSETS[rowIndex] + index * (KEY_SIZE + KEY_GAP)
@@ -125,9 +126,9 @@ export function KeyboardGuide({
         </g>
       </svg>
 
-      {highlight?.shift ? (
+      {hintParts.length > 0 ? (
         <p className="text-[0.65rem] tracking-[0.15em] text-stone-400 uppercase dark:text-stone-500">
-          Hold shift
+          {hintParts.join(' · ')}
         </p>
       ) : null}
     </div>

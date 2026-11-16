@@ -13,6 +13,14 @@ export interface KeyboardTarget {
 /** How long an idle pause may last before the guide offers help. */
 export const HESITATION_HINT_MS = 1_200
 
+/** The keys drawn by the guide, in physical rows. */
+export const KEYBOARD_ROWS: ReadonlyArray<readonly string[]> = [
+  '1234567890-='.split(''),
+  'qwertyuiop[]'.split(''),
+  "asdfjkl;'".split(''),
+  'zxcvbnm,./'.split(''),
+]
+
 const UNSHIFTED = new Set(
   "abcdefghijklmnopqrstuvwxyz0123456789`-=[]\\;,./'".split(''),
 )

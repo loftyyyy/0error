@@ -21,8 +21,9 @@ whatever pair or finger still makes you hesitate.
 
 ## In the browser
 
-- The keyboard drawing reveals the next key only after 1.2 s without input.
-  Shifted symbols point at the base key and add a Shift hint.
+- The keyboard drawing reveals the next key only after 1.2 s without input, and
+  names the finger that reaches it. Shifted symbols point at the base key and
+  add a Shift hint.
 - The text track colors by rhythm, not by mistakes: up to 400 ms is smooth,
   up to 900 ms steady, and beyond that hesitant.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
