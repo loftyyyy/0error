@@ -26,20 +26,6 @@ spring:
     clean-disabled: true
     validate-on-migrate: true
 
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: 2s
-      connect-timeout: 2s
-      lettuce:
-        pool:
-          enabled: true
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-
   ai:
     openai:
       # Placeholder keeps the context bootable without a key. Real keys come from the environment.
@@ -62,11 +48,6 @@ management:
     health:
       probes:
         enabled: true
-  health:
-    redis:
-      # Redis is provisioned for later caching, but no application code uses it
-      # yet. An unused dependency must not turn the liveness probe red.
-      enabled: false
 
 app:
   cors:

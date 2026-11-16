@@ -45,7 +45,7 @@ Java 17+ and Node 20.19+ are required.
 ## Quick start
 
 ```bash
-# 1. Postgres (Redis is provisioned but unused, so it is not needed)
+# 1. Postgres
 docker compose up -d postgres
 
 # 2. Backend on http://localhost:8080
@@ -81,7 +81,6 @@ Copy `.env.example` values into the backend process environment as needed.
 | `DRILL_AI_ENABLED`           | `true`                  | Background drill prefetch                    |
 | `TELEMETRY_RAW_RETENTION_DAYS` | `30`                  | Raw keystroke retention                      |
 | `TELEMETRY_MAX_BATCH_SIZE`   | `500`                   | Events accepted per telemetry request        |
-| `REDIS_*`                    | localhost:6379          | Reserved; no application code reads Redis    |
 
 The frontend takes one optional variable, `VITE_API_BASE_URL`. Leave it empty in
 development so the Vite proxy is used; set it when the API lives on another
@@ -207,5 +206,4 @@ frontend/
   and never trusts client-calculated aggregates.
 - Without `OPENAI_API_KEY` the app is fully functional: drills come from the
   static pool and coaching from the deterministic fallback.
-- Redis is wired into `docker-compose.yml` for future caching but no code uses
-  it, so its health indicator is disabled and it is not required to run.
+- Postgres is the only service required to run. Nothing is cached out of process.

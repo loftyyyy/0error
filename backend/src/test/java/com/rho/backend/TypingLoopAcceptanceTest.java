@@ -78,8 +78,8 @@ class TypingLoopAcceptanceTest {
 		UUID userId = guest.guestId();
 
 		try {
-			// Health reports the dependencies the app actually uses. Redis is
-			// provisioned but unused, so its absence must not fail the probe.
+			// Postgres is the only dependency the app uses, so the probe only has
+			// to agree with a running database.
 			client.get()
 					.uri("/actuator/health")
 					.exchange()

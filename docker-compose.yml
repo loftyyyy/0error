@@ -16,20 +16,5 @@ services:
       timeout: 3s
       retries: 10
 
-  redis:
-    image: redis:8-alpine
-    container_name: 0error-redis
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
-    volumes:
-      - 0error-redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
 volumes:
   0error-pgdata:
-  0error-redisdata:
