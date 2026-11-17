@@ -2,6 +2,8 @@ import { authedFetch } from '../identity/guestSession'
 
 /** A drill the server has already validated against the tier charset. */
 export interface Drill {
+  /** Server-issued id the session must cite; the text itself is not trusted. */
+  drillId: string
   tier: number
   tierName: string
   charset: string
@@ -24,6 +26,8 @@ export interface DrillSet {
   source: Drill['source']
   /** The combined text the user types. */
   text: string
+  /** Issuances for the drills in order; session creation cites these. */
+  drillIds: string[]
   /** Last drill in the set, so a retry can avoid starting with it again. */
   tail: string
 }
@@ -45,6 +49,7 @@ export async function fetchDrillSet(tier: number, exclude?: string): Promise<Dri
     charset: first.charset,
     source: drills.every((drill) => drill.source === 'STATIC') ? 'STATIC' : 'AI',
     text: drills.map((drill) => drill.text).join(' '),
+    drillIds: drills.map((drill) => drill.drillId),
     tail: drills[drills.length - 1].text,
   }
 }
@@ -69,7 +74,11 @@ export async function fetchNextDrill(tier: number, exclude?: string): Promise<Dr
   }
 
   const drill = (await response.json()) as Partial<Drill>
-  if (typeof drill.text !== 'string' || typeof drill.charset !== 'string') {
+  if (
+    typeof drill.drillId !== 'string' ||
+    typeof drill.text !== 'string' ||
+    typeof drill.charset !== 'string'
+  ) {
     throw new Error('The drill response was invalid')
   }
   return drill as Drill

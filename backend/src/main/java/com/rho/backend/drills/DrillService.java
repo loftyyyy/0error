@@ -23,6 +23,7 @@ public class DrillService {
 	private final TierProgressService progress;
 	private final WeakPairService weakPairs;
 	private final FingerStatService fingers;
+	private final DrillIssuanceStore issuances;
 
 	public DrillService(
 			TierCatalogue catalogue,
@@ -31,7 +32,8 @@ public class DrillService {
 			AiDrillCache aiDrills,
 			TierProgressService progress,
 			WeakPairService weakPairs,
-			FingerStatService fingers) {
+			FingerStatService fingers,
+			DrillIssuanceStore issuances) {
 		this.catalogue = catalogue;
 		this.pool = pool;
 		this.validator = validator;
@@ -39,6 +41,7 @@ public class DrillService {
 		this.progress = progress;
 		this.weakPairs = weakPairs;
 		this.fingers = fingers;
+		this.issuances = issuances;
 	}
 
 	public Mono<DrillResponse> next(UUID userId, int tier, String exclude) {
@@ -56,6 +59,7 @@ public class DrillService {
 										weakPairs.focus(userId, tier),
 										fingers.focus(userId, tier))
 								.flatMap(focus -> serve(
+										userId,
 										definition,
 										new DrillFocus(
 												focus.getT1(),
@@ -68,7 +72,7 @@ public class DrillService {
 	}
 
 	private Mono<DrillResponse> serve(
-			TierDefinition definition, DrillFocus focus, String exclude) {
+			UUID userId, TierDefinition definition, DrillFocus focus, String exclude) {
 		Optional<String> generated = aiDrills.take(definition.tier(), focus, exclude)
 				.filter(candidate -> validator.isValid(candidate, definition));
 
@@ -81,12 +85,14 @@ public class DrillService {
 		// Keep the cache warm for the next request, never for this one.
 		aiDrills.refill(definition, focus, text);
 
-		return Mono.just(new DrillResponse(
-				definition.tier(),
-				definition.name(),
-				definition.charset(),
-				source,
-				text,
-				text.length()));
+		return issuances.issue(userId, definition, text, source)
+				.map(drillId -> new DrillResponse(
+						drillId,
+						definition.tier(),
+						definition.name(),
+						definition.charset(),
+						source,
+						text,
+						text.length()));
 	}
 }

@@ -22,6 +22,7 @@ public record TypingSession(
 		@Column("drill_source") String drillSource,
 		@Column("target_length") int targetLength,
 		@Column("allowed_charset") String allowedCharset,
+		@Column("drill_text") String drillText,
 		String status,
 		@Column("started_at") OffsetDateTime startedAt,
 		@Column("ended_at") OffsetDateTime endedAt,

@@ -2,10 +2,8 @@ import { authedFetch } from '../identity/guestSession'
 
 export interface CreateSessionInput {
   clientSessionId: string
-  tier: number
-  targetCharset: string
-  targetLength: number
-  drillSource?: 'STATIC' | 'AI'
+  /** The server-issued drills this session claims, in typing order. */
+  drillIds: string[]
 }
 
 export interface ServerSession {
@@ -29,15 +27,18 @@ export async function createServerSession(input: CreateSessionInput): Promise<Se
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
       clientSessionId: input.clientSessionId,
-      tier: input.tier,
-      targetCharset: input.targetCharset,
-      targetLength: input.targetLength,
-      drillSource: input.drillSource ?? 'STATIC',
+      drillIds: input.drillIds,
     }),
   })
 
   if (response.status === 403) {
-    throw new Error(`Tier ${input.tier} is still locked`)
+    throw new Error('This tier is still locked')
+  }
+  if (response.status === 400) {
+    throw new Error('This drill set expired. Load a fresh drill.')
+  }
+  if (response.status === 409) {
+    throw new Error('This drill was already used. Load a fresh drill.')
   }
   if (!response.ok) {
     throw new Error(`Could not start a session (${response.status})`)

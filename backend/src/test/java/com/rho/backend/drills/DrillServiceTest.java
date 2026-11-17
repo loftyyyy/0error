@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 class DrillServiceTest {
 
 	private static final UUID USER_ID = UUID.randomUUID();
+	private static final UUID DRILL_ID = UUID.randomUUID();
 
 	@Mock
 	private TierProgressService progress;
@@ -44,11 +45,16 @@ class DrillServiceTest {
 	@Mock
 	private FingerStatService fingers;
 
+	@Mock
+	private DrillIssuanceStore issuances;
+
 	@org.junit.jupiter.api.BeforeEach
 	void noFocusByDefault() {
 		lenient().when(weakPairs.focus(any(), anyInt())).thenReturn(Mono.just(List.of()));
 		lenient().when(fingers.focus(any(), anyInt()))
 				.thenReturn(Mono.just(Optional.empty()));
+		lenient().when(issuances.issue(any(), any(), any(), any()))
+				.thenReturn(Mono.just(DRILL_ID));
 	}
 
 	@Test
@@ -71,9 +77,11 @@ class DrillServiceTest {
 		DrillResponse drill = service().next(USER_ID, 0, null).block();
 
 		assertThat(drill).isNotNull();
+		assertThat(drill.drillId()).isEqualTo(DRILL_ID);
 		assertThat(drill.source()).isEqualTo("STATIC");
 		assertThat(drill.text().length()).isBetween(40, 60);
 		assertThat(drill.charset()).contains("a", "s", "d", "f", "j", "k", "l", ";", " ");
+		verify(issuances).issue(USER_ID, new TierCatalogue().require(0), drill.text(), "STATIC");
 	}
 
 	@Test
@@ -167,6 +175,7 @@ class DrillServiceTest {
 				aiDrills,
 				progress,
 				weakPairs,
-				fingers);
+				fingers,
+				issuances);
 	}
 }

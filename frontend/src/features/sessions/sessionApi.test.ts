@@ -21,9 +21,7 @@ class MemoryStorage {
 
 const input: CreateSessionInput = {
   clientSessionId: '11111111-1111-4111-8111-111111111111',
-  tier: 0,
-  targetCharset: 'asdfjkl;',
-  targetLength: 43,
+  drillIds: ['aaaa', 'bbbb', 'cccc'],
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -79,8 +77,7 @@ describe('createServerSession', () => {
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer g_test')
     expect(JSON.parse(String(init.body))).toMatchObject({
       clientSessionId: input.clientSessionId,
-      targetCharset: 'asdfjkl;',
-      drillSource: 'STATIC',
+      drillIds: input.drillIds,
     })
   })
 

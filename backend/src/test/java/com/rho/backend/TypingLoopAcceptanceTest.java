@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.rho.backend.analysis.FingerReport;
 import com.rho.backend.analysis.WeakPairReport;
@@ -46,7 +47,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfEnvironmentVariable(named = "RUN_INTEGRATION_TESTS", matches = "true")
 class TypingLoopAcceptanceTest {
 
-	private static final int REPEATS = 3;
 	private static final int PAUSE_DISPLAY_MS = 1_000;
 
 	@LocalServerPort
@@ -91,28 +91,31 @@ class TypingLoopAcceptanceTest {
 			assertThat(start.tiers().get(0).unlocked()).isTrue();
 			assertThat(start.tiers().get(1).unlocked()).isFalse();
 
-			// A locked tier is refused before any session exists.
+			// A session cannot be opened from a drill the server never issued.
 			client.post()
 					.uri("/api/v1/sessions")
 					.headers(headers -> headers.setBearerAuth(token))
 					.bodyValue(new CreateSessionRequest(
-							UUID.randomUUID(), 1, "qwertyuiopasdfghjkl; ", 40, "STATIC"))
+							UUID.randomUUID(), List.of(UUID.randomUUID())))
 					.exchange()
-					.expectStatus().isForbidden();
+					.expectStatus().isBadRequest();
 
-			DrillResponse drill = nextDrill(token, 0, null);
+			List<DrillResponse> drills = drillSet(token, 0, null);
+			DrillResponse drill = drills.get(0);
 			assertThat(drill.tier()).isEqualTo(0);
 			assertThat(drill.source()).isEqualTo("STATIC");
 			assertThat(drill.text()).hasSize(drill.length());
 			assertThat(drill.text().length()).isBetween(40, 60);
 
-			SessionResponse session = createSession(
-					token, 0, drill.charset(), drill.text().length() * REPEATS, drill.source());
+			String typed = composedText(drills);
+			SessionResponse session = createSession(token, drills);
 			assertThat(session.status()).isEqualTo("ACTIVE");
+			// The server derived the target from the issued drills, not the client.
+			assertThat(session.targetLength()).isEqualTo(typed.length());
+			assertThat(session.targetCharset()).isEqualTo(drill.charset());
 
 			// The typist stumbles on every occurrence of one repeated transition
 			// on the first pass; corrections never erase it.
-			String typed = drill.text().repeat(REPEATS);
 			String pair = leastFrequentPair(drill.text());
 			List<Integer> stumbles = occurrences(drill.text(), pair);
 			String wrong = aDifferentAllowedKey(drill.charset(), pair.charAt(1));
@@ -174,15 +177,24 @@ class TypingLoopAcceptanceTest {
 					.exchange()
 					.expectStatus().isEqualTo(409);
 
-			// The weak pair now steers the next drill.
-			DrillResponse focused = nextDrill(token, 0, drill.text());
-			assertThat(focused.text()).contains(pair);
-			assertThat(focused.text().length()).isBetween(40, 60);
+			// A drill id is single-use: a second session cannot cite the same set.
+			client.post()
+					.uri("/api/v1/sessions")
+					.headers(headers -> headers.setBearerAuth(token))
+					.bodyValue(new CreateSessionRequest(UUID.randomUUID(), drillIds(drills)))
+					.exchange()
+					.expectStatus().isBadRequest();
+
+			// The weak pair now steers the next set of drills.
+			List<DrillResponse> focusedDrills = drillSet(token, 0, drill.text());
+			assertThat(focusedDrills)
+					.anySatisfy(focused -> assertThat(focused.text()).contains(pair));
+			assertThat(focusedDrills)
+					.allSatisfy(focused -> assertThat(focused.text().length()).isBetween(40, 60));
 
 			// A second consecutive pass unlocks the next tier.
-			SessionResponse secondSession = createSession(
-					token, 0, focused.charset(), focused.text().length() * REPEATS, focused.source());
-			String secondTyped = focused.text().repeat(REPEATS);
+			SessionResponse secondSession = createSession(token, focusedDrills);
+			String secondTyped = composedText(focusedDrills);
 			sendTelemetry(token, secondSession.id(), keystrokes(secondTyped, List.of(), null));
 
 			SessionCompletionResponse second = complete(token, secondSession.id());
@@ -239,13 +251,30 @@ class TypingLoopAcceptanceTest {
 		return drill;
 	}
 
-	private SessionResponse createSession(
-			String token, int tier, String charset, int targetLength, String source) {
+	private List<DrillResponse> drillSet(String token, int tier, String exclude) {
+		List<DrillResponse> drills = new ArrayList<>();
+		String previous = exclude;
+		for (int index = 0; index < 3; index++) {
+			DrillResponse next = nextDrill(token, tier, previous);
+			drills.add(next);
+			previous = next.text();
+		}
+		return drills;
+	}
+
+	private static List<UUID> drillIds(List<DrillResponse> drills) {
+		return drills.stream().map(DrillResponse::drillId).toList();
+	}
+
+	private static String composedText(List<DrillResponse> drills) {
+		return drills.stream().map(DrillResponse::text).collect(Collectors.joining(" "));
+	}
+
+	private SessionResponse createSession(String token, List<DrillResponse> drills) {
 		SessionResponse session = client.post()
 				.uri("/api/v1/sessions")
 				.headers(headers -> headers.setBearerAuth(token))
-				.bodyValue(new CreateSessionRequest(
-						UUID.randomUUID(), tier, charset, targetLength, source))
+				.bodyValue(new CreateSessionRequest(UUID.randomUUID(), drillIds(drills)))
 				.exchange()
 				.expectStatus().isCreated()
 				.expectBody(SessionResponse.class)

@@ -36,14 +36,8 @@ public class TelemetryIngestService {
 					HttpStatus.BAD_REQUEST, "sessionId in body does not match the path"));
 		}
 
-		// Correctness feeds accuracy, so it is re-derived from the characters
-		// rather than taken from the client. Ignoring the flag here keeps every
-		// stored row, retry, and later aggregate consistent with the server.
-		List<RawKeystroke> events = request.events().stream()
-				.map(TelemetryIngestService::withServerCorrectness)
-				.toList();
 		Set<Integer> sequences = new HashSet<>();
-		for (RawKeystroke event : events) {
+		for (RawKeystroke event : request.events()) {
 			if (!sequences.add(event.seq())) {
 				return Mono.error(new ResponseStatusException(
 						HttpStatus.BAD_REQUEST, "Duplicate seq " + event.seq() + " in batch"));
@@ -53,32 +47,54 @@ public class TelemetryIngestService {
 		return sessions.findByIdAndUserId(sessionId, userId)
 				.switchIfEmpty(Mono.error(new ResponseStatusException(
 						HttpStatus.NOT_FOUND, "Session not found")))
-				.flatMap(session -> writer.insertIgnoringDuplicates(sessionId, events))
-				.flatMap(inserted -> metrics.recompute(sessionId)
-						.map(aggregates -> new TelemetryIngestResponse(
-								sessionId,
-								events.size(),
-								inserted,
-								events.size() - inserted)));
+				.flatMap(session -> {
+					// Both the target character and correctness are derived from
+					// the server-issued drill text, so a client cannot rewrite
+					// what it was asked to type. The client's expected/correct
+					// values are ignored here.
+					List<RawKeystroke> events = request.events().stream()
+							.map(event -> withServerTarget(event, session.drillText()))
+							.toList();
+
+					return writer.insertIgnoringDuplicates(sessionId, events)
+							.flatMap(inserted -> metrics.recompute(sessionId)
+									.map(aggregates -> new TelemetryIngestResponse(
+											sessionId,
+											events.size(),
+											inserted,
+											events.size() - inserted)));
+				});
 	}
 
 	/**
-	 * A key is correct only when the actual character equals the expected one.
-	 * Backspaces have no target and are always correct; a key without an
-	 * expected character cannot be correct.
+	 * A key is correct only when the actual character equals the character the
+	 * server issued at that position. Backspaces have no target and are always
+	 * correct; a position outside the drill text cannot be correct. Sessions
+	 * created before drill text was persisted fall back to the client's value.
 	 */
-	private static RawKeystroke withServerCorrectness(RawKeystroke event) {
+	private static RawKeystroke withServerTarget(RawKeystroke event, String drillText) {
+		String expected = drillText == null
+				? event.expected()
+				: expectedAt(drillText, event.position());
 		boolean correct = event.isBackspace()
-				|| (event.expected() != null && event.expected().equals(event.actual()));
+				|| (expected != null && expected.equals(event.actual()));
+
 		return new RawKeystroke(
 				event.seq(),
 				event.position(),
 				event.kind(),
-				event.expected(),
+				expected,
 				event.actual(),
 				correct,
 				event.t(),
 				event.displayMs(),
 				event.warmup());
+	}
+
+	private static String expectedAt(String drillText, int position) {
+		if (position < 0 || position >= drillText.length()) {
+			return null;
+		}
+		return String.valueOf(drillText.charAt(position));
 	}
 }

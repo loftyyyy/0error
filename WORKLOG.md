@@ -9,7 +9,7 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  113 tests pass, including the Postgres-backed acceptance test.
+  114 tests pass, including the Postgres-backed acceptance test.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 69 tests in 15 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | App-level jsdom flow test: a guest goes from an empty page through progress, three drills, session creation, eight keydowns, the queued telemetry POST, completion, the result panel, and the streamed coach note. It also asserts the raw `expected`/`actual` pairs reach the server. |
+| `HEAD`    | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
+| `9100031` | App-level jsdom flow test: a guest goes from an empty page through progress, three drills, session creation, eight keydowns, the queued telemetry POST, completion, the result panel, and the streamed coach note. It also asserts the raw `expected`/`actual` pairs reach the server. |
 | `34575e5` | Focused controls own their keys, and a pointer click on the theme switch returns focus so the next keystroke is typed instead of swallowed. |
 | `f99ebc4` | Remembered light/dark switch. Dark styles key on an `<html>` class, the choice is stored, an inline script applies it before first paint, and the OS setting is followed until the user chooses. |
 | `60e67ff` | The client input path is tested in jsdom: real `keydown`, `blur`, and `paste` events through the mounted hook, plus fake-timer tests for the hesitation delay. |
@@ -55,6 +56,10 @@ commit `HEAD`; older rows keep their real hashes.
 - **Server owns the numbers.** Telemetry is stored raw; accuracy, cadence, pairs,
   and reaches are recomputed from rows. Correctness is derived from `expected`
   against `actual`, never from the client flag.
+- **Drills are issued, not echoed.** `GET /drills/next` stores the text with an
+  issuance id; `POST /sessions` accepts only ids. The persisted session text is
+  the source of every telemetry `expected` character. Ids are single-use,
+  same-tier, owned, and expire after 10 minutes.
 - **AI is off the critical path.** Drills are prefetched and cached; the static
   pool always answers. Coaching always has a deterministic fallback.
 - **Identity is a guest token.** No accounts; `X-Guest-Id` + `X-Guest-Token`
@@ -115,22 +120,18 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Server-owned drill text.** A client supplies `expected` per keystroke and
-   the tier charset on session creation, so a modified client could claim a
-   perfect run and unlock every tier. The fix is to issue drills with a signed
-   token (or a stored issuance id), persist the text with the session, and
-   normalize telemetry `expected` from that text. Acceptance: a forged event
-   stream is rejected or rewritten; the acceptance test still passes; offline
-   and AI drills keep working.
-2. **Accessibility polish.** The hesitation hint and gate outcome are visual
+1. **Accessibility polish.** The hesitation hint and gate outcome are visual
    only. Announce the hint through a polite live region, and honour
    `prefers-reduced-motion` for the guide's fade and the coach cursor.
-3. **Tier ladder.** `/api/v1/progress` returns every tier with effective
+2. **Tier ladder.** `/api/v1/progress` returns every tier with effective
    thresholds, but the client only uses the highest unlocked tier. A small
    ladder would show what is next and what the relaxed thresholds are.
-4. **Completion error path.** `App.test.tsx` covers the happy loop. A second
+3. **Completion error path.** `App.test.tsx` covers the happy loop. A second
    case should fail the telemetry POST and prove the result panel stays hidden,
    the retry button rescores, and nothing is lost from the outbox.
+4. **Issuance edge cases in tests.** Unit and HTTP paths cover missing, reused,
+   and mixed-tier ids. Expiry and a foreign guest are exercised only by code,
+   not by a test, because they need clock control or a second guest.
 5. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.

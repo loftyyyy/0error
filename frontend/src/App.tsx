@@ -56,10 +56,7 @@ function App() {
         const fetched = await fetchDrillSet(tier, next.exclude)
         const session = await createServerSession({
           clientSessionId: newClientSessionId(),
-          tier: fetched.tier,
-          targetCharset: fetched.charset,
-          targetLength: fetched.text.length,
-          drillSource: fetched.source,
+          drillIds: fetched.drillIds,
         })
 
         if (cancelled) return

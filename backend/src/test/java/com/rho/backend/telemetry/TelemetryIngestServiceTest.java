@@ -87,7 +87,7 @@ class TelemetryIngestServiceTest {
 
 	@Test
 	void clientCorrectnessFlagIsIgnored() {
-		givenOwnedSession();
+		givenOwnedSession("ab");
 		when(writer.insertIgnoringDuplicates(any(), anyList())).thenReturn(Mono.just(4));
 		when(metrics.recompute(SESSION_ID)).thenReturn(Mono.just(new SessionMetrics(
 				4, 1, new java.math.BigDecimal("25.00"), 100, 100, 0)));
@@ -158,10 +158,45 @@ class TelemetryIngestServiceTest {
 		verify(sessions, never()).findByIdAndUserId(any(), any());
 	}
 
+	@Test
+	void expectedCharactersAreRewrittenFromTheIssuedDrillText() {
+		givenOwnedSession("asdf");
+		when(writer.insertIgnoringDuplicates(any(), anyList())).thenReturn(Mono.just(5));
+		when(metrics.recompute(SESSION_ID)).thenReturn(Mono.just(new SessionMetrics(
+				5, 4, new java.math.BigDecimal("80.00"), 100, 100, 0)));
+
+		// The client claims these expected characters and flags every key correct.
+		List<RawKeystroke> sent = List.of(
+				new RawKeystroke(0, 0, RawKeystroke.KEY, "z", "a", true, 0, 100, false),
+				new RawKeystroke(1, 1, RawKeystroke.KEY, "z", "s", true, 100, 100, false),
+				new RawKeystroke(2, 2, RawKeystroke.KEY, "z", "d", true, 200, 100, false),
+				new RawKeystroke(3, 3, RawKeystroke.KEY, "z", "f", true, 300, 100, false),
+				new RawKeystroke(4, 4, RawKeystroke.KEY, "a", "a", true, 400, 100, false));
+
+		StepVerifier.create(service.ingest(USER_ID, SESSION_ID,
+						new TelemetryBatchRequest("b", SESSION_ID, Instant.now(), sent)))
+				.assertNext(response -> assertThat(response.inserted()).isEqualTo(5))
+				.verifyComplete();
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<RawKeystroke>> stored = ArgumentCaptor.forClass(List.class);
+		verify(writer).insertIgnoringDuplicates(eq(SESSION_ID), stored.capture());
+		assertThat(stored.getValue())
+				.extracting(RawKeystroke::expected)
+				.containsExactly("a", "s", "d", "f", null);
+		assertThat(stored.getValue())
+				.extracting(RawKeystroke::correct)
+				.containsExactly(true, true, true, true, false);
+	}
+
 	private void givenOwnedSession() {
+		givenOwnedSession("a".repeat(64));
+	}
+
+	private void givenOwnedSession(String drillText) {
 		TypingSession session = new TypingSession(
-				SESSION_ID, USER_ID, UUID.randomUUID(), 0, "STATIC", 40, "asdfjkl;",
-				"ACTIVE", OffsetDateTime.now(), null, 0, 0, null, null, null, 0, null, null);
+				SESSION_ID, USER_ID, UUID.randomUUID(), 0, "STATIC", drillText.length(), "asdfjkl;",
+				drillText, "ACTIVE", OffsetDateTime.now(), null, 0, 0, null, null, null, 0, null, null);
 		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session));
 	}
 

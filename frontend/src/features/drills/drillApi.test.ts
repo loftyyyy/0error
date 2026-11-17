@@ -20,6 +20,7 @@ class MemoryStorage {
 }
 
 const drill: Drill = {
+  drillId: 'drill-1',
   tier: 1,
   tierName: 'Top row',
   charset: 'qwertyuiopasdfghjkl; ',
@@ -88,12 +89,14 @@ describe('fetchNextDrill', () => {
 
 const secondDrill: Drill = {
   ...drill,
+  drillId: 'drill-2',
   text: 'qwerty uiop asdfg hjkl; qwerty uiop asdfg hjkl;',
   length: 50,
 }
 
 const thirdDrill: Drill = {
   ...drill,
+  drillId: 'drill-3',
   text: 'qq ww ee rr tt yy uu ii oo pp aa ss dd ff gg hh jj kk ll',
   length: 56,
 }
@@ -122,6 +125,7 @@ describe('fetchDrillSet', () => {
     expect(set.text.length).toBeGreaterThanOrEqual(120)
     expect(set.tail).toBe(thirdDrill.text)
     expect(set.charset).toBe(drill.charset)
+    expect(set.drillIds).toEqual(['drill-1', 'drill-2', 'drill-3'])
     expect(fetchMock).toHaveBeenCalledTimes(3)
 
     const urls = fetchMock.mock.calls.map(([url]) => String(url))

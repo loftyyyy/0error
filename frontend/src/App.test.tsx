@@ -38,6 +38,8 @@ const drill = {
   length: 2,
 }
 
+let drillIssued = 0
+
 const session = {
   id: 'session-1',
   clientSessionId: 'client-1',
@@ -117,7 +119,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: [] })
   if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: [] })
   if (url.includes('/api/v1/progress')) return json(progress)
-  if (url.includes('/api/v1/drills/next')) return json(drill)
+  if (url.includes('/api/v1/drills/next')) {
+    drillIssued += 1
+    return json({ ...drill, drillId: `drill-${drillIssued}` })
+  }
   if (url.includes('/api/v1/auth/guest')) return json({ guestId: 'guest-1', token: 'token-1' })
   if (url.includes('/telemetry')) return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   if (url.includes('/complete')) return json(completion)
@@ -157,6 +162,7 @@ async function press(key: string) {
 beforeEach(async () => {
   window.localStorage.clear()
   calls = []
+  drillIssued = 0
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -220,8 +226,15 @@ describe('App', () => {
       .map((call) => JSON.parse(call.body ?? '{}') as { events: { expected: string; actual: string }[] })
       .flatMap((batch) => batch.events)
 
+    const creation = calls.find(
+      (call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST',
+    )
+    expect(creation).toBeDefined()
+    expect(JSON.parse(creation?.body ?? '{}')).toMatchObject({
+      drillIds: ['drill-1', 'drill-2', 'drill-3'],
+    })
+
     expect(telemetry.map((event) => event.expected).join('')).toBe(DRILL_TEXT)
     expect(telemetry.map((event) => event.actual).join('')).toBe(DRILL_TEXT)
-    expect(calls.some((call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST')).toBe(true)
   })
 })

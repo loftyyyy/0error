@@ -8,11 +8,14 @@ whatever pair or finger still makes you hesitate.
 ## How a session works
 
 1. The browser asks for the guest identity once and keeps the bearer token.
-2. `GET /api/v1/drills/next?tier=` returns a short drill for the current tier.
+2. `GET /api/v1/drills/next?tier=` returns a short drill for the current tier,
+   with a server-issued `drillId`. Three drills form one attempt.
 3. Typing is scored locally for the live display only; every keystroke is also
    queued in IndexedDB and sent to the server in batches.
-4. The server recomputes accuracy and cadence from the raw rows, never from
-   client aggregates.
+4. `POST /api/v1/sessions` cites the issued drill ids. The server persists the
+   exact text, derives the tier, charset, and length from it, and rewrites every
+   telemetry `expected` character from that text. Aggregates are recomputed from
+   the raw rows, never from client aggregates.
 5. Completion applies the unlock gate, merges the session into pair and finger
    aggregates, and marks the session `COMPLETED`.
 6. The client streams coaching over SSE and shows the weakest transitional pair
@@ -109,6 +112,12 @@ always answers the request. Generated drills are prefetched in the background
 and cached by tier plus focus pairs and weak reach, so the model is never on the
 request path.
 
+**Issued text.** Every served drill is stored with a short-lived issuance id.
+A session can only cite owned, unexpired, unconsumed ids from one tier, and each
+id works once. The session keeps the composed text, so a client cannot change
+the target, the charset, the length, or the expected characters it is scored
+against.
+
 **Adaptive targeting.** Consecutive expected characters form a pair keyed by the
 second key. A pair or finger is weak when it has at least two attempts and a
 score of 0.1 or more, where score is `0.55 × error rate + 0.30 × pause rate +
@@ -132,7 +141,7 @@ guest that owns them. The actuator probes are public.
 | ------ | -------------------------------------- | --------------------------------------------------- |
 | POST   | `/api/v1/auth/guest`                   | Create or rotate a guest token                      |
 | GET    | `/api/v1/drills/next?tier=&exclude=`   | Next drill; `403` when the tier is locked           |
-| POST   | `/api/v1/sessions`                     | Start a session; idempotent per `clientSessionId`   |
+| POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
 | POST   | `/api/v1/sessions/{id}/complete`       | Score, merge aggregates, apply the gate             |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
@@ -143,7 +152,9 @@ guest that owns them. The actuator probes are public.
 
 A telemetry batch carries `{ batchId, sessionId, sentAt, events[] }`; each event
 is `{ seq, position, kind, expected, actual, correct, t, displayMs, warmup }`.
-The unique `(session_id, seq)` constraint makes retried batches safe.
+The server ignores `expected` and `correct` and reads both from the session's
+issued text. The unique `(session_id, seq)` constraint makes retried batches
+safe.
 
 ## Tests
 
@@ -182,9 +193,10 @@ npm test
 npm run build
 ```
 
-Most frontend tests are pure functions rendered to static markup. The keystroke
-capture and hesitation tests run in jsdom and dispatch real `keydown`, `blur`,
-and `paste` events, so the window wiring is covered without a browser.
+Most frontend tests are pure functions rendered to static markup. The `App` flow
+test, the keystroke capture test, and the hesitation test run in jsdom and
+dispatch real `keydown`, `blur`, and `paste` events, so the full guest loop and
+the window wiring are covered without a browser.
 
 ## Project layout
 
