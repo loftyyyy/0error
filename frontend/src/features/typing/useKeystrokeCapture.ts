@@ -27,9 +27,17 @@ export interface KeystrokeCapture {
 
 const NOTICE_TIMEOUT_MS = 2_500
 
-function isEditableTarget(target: EventTarget | null): boolean {
+/**
+ * A focused control owns its own keys. Without this the drill would eat Space
+ * on a focused button and prevent the button from activating.
+ */
+function isControlTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], button, a[href], summary',
+    ),
+  )
 }
 
 /**
@@ -117,7 +125,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
       if (event.repeat || event.isComposing) return
-      if (isEditableTarget(event.target)) return
+      if (isControlTarget(event.target)) return
       if (event.key === 'Dead' || event.key === 'Process' || event.key === 'Unidentified') return
       if (engine.isComplete) return
 
@@ -149,7 +157,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
     }
 
     const handlePaste = (event: ClipboardEvent) => {
-      if (isEditableTarget(event.target)) return
+      if (isControlTarget(event.target)) return
       event.preventDefault()
       showNotice('paste-blocked')
     }

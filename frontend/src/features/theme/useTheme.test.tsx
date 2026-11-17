@@ -120,6 +120,21 @@ describe('useTheme', () => {
     media.setDark(true)
     expect(darkClass()).toBe(false)
   })
+
+  it('hands focus back after a pointer click so typing is not stolen', () => {
+    stubMedia(false)
+    mount(<ThemeToggle />)
+
+    const button = container!.querySelector('button')!
+    act(() => button.focus())
+    expect(document.activeElement).toBe(button)
+
+    act(() => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    })
+
+    expect(document.activeElement).not.toBe(button)
+  })
 })
 
 describe('applyTheme', () => {

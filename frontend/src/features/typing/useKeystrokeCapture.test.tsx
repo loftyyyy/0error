@@ -134,7 +134,7 @@ describe('useKeystrokeCapture', () => {
     expect(read(container, 'typed')).toBe('2')
   })
 
-  it('ignores modified keys and keys aimed at an editable field', async () => {
+  it('ignores modified keys and keys aimed at a control', async () => {
     const container = mount({ sessionId: 'capture-2', text: 'asdf' })
 
     const input = document.createElement('input')
@@ -143,10 +143,21 @@ describe('useKeystrokeCapture', () => {
     input.dispatchEvent(typing)
     input.remove()
 
+    const button = document.createElement('button')
+    document.body.append(button)
+    const activating = new KeyboardEvent('keydown', {
+      key: ' ',
+      cancelable: true,
+      bubbles: true,
+    })
+    button.dispatchEvent(activating)
+    button.remove()
+
     const shortcut = await press('a', { ctrlKey: true })
     await settle()
 
     expect(typing.defaultPrevented).toBe(false)
+    expect(activating.defaultPrevented).toBe(false)
     expect(shortcut.defaultPrevented).toBe(false)
     expect(read(container, 'typed')).toBe('0')
 
