@@ -6,6 +6,7 @@ import { streamFeedback } from './features/feedback/feedbackApi'
 import { FingerNote } from './features/progress/FingerNote'
 import { FocusNote } from './features/progress/FocusNote'
 import { activeTier, fetchProgress } from './features/progress/progressApi'
+import type { ProgressSummary } from './features/progress/progressApi'
 import { completeServerSession, createServerSession } from './features/sessions/sessionApi'
 import type { SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
@@ -45,6 +46,7 @@ function App() {
   const [phase, setPhase] = useState<Phase>('loading')
   const [drill, setDrill] = useState<ActiveDrill | null>(null)
   const [result, setResult] = useState<SessionCompletion | null>(null)
+  const [progress, setProgress] = useState<ProgressSummary | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -52,7 +54,11 @@ function App() {
 
     const bootstrap = async () => {
       try {
-        const tier = next.tier ?? activeTier(await fetchProgress())
+        const summary = await fetchProgress()
+        if (cancelled) return
+        setProgress(summary)
+
+        const tier = next.tier ?? activeTier(summary)
         const fetched = await fetchDrillSet(tier, next.exclude)
         const session = await createServerSession({
           clientSessionId: newClientSessionId(),
@@ -109,6 +115,12 @@ function App() {
       const completion = await completeServerSession(drill.sessionId)
       setResult(completion)
       setPhase('result')
+
+      // The ladder only changes here, so refresh it once the score is in.
+      // A failed refresh leaves the last known ladder on screen.
+      void fetchProgress()
+        .then(setProgress)
+        .catch(() => undefined)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : 'Could not score this drill.')
       setPhase('error')
@@ -156,6 +168,7 @@ function App() {
           <ResultPanel
             drill={drill}
             result={result}
+            progress={progress}
             onNext={() => startNext(result.unlockedTier ?? drill.tier, drill.tail)}
           />
         ) : null}
@@ -305,10 +318,12 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
 function ResultPanel({
   drill,
   result,
+  progress,
   onNext,
 }: {
   drill: ActiveDrill
   result: SessionCompletion
+  progress: ProgressSummary | null
   onNext: () => void
 }) {
   return (
@@ -357,6 +372,8 @@ function ResultPanel({
         </ul>
       ) : null}
 
+      {progress ? <TierLadder progress={progress} currentTier={result.tier} /> : null}
+
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote tier={result.tier} />
       <FingerNote tier={result.tier} />
@@ -370,6 +387,63 @@ function ResultPanel({
         <ArrowRight size={13} strokeWidth={1.75} />
       </button>
     </div>
+  )
+}
+
+/**
+ * The curriculum at a glance. Every tier the server knows is drawn, the one
+ * being practised is marked, and the next locked tier states the gate it still
+ * has to clear with the cadence it is actually held to.
+ */
+function TierLadder({
+  progress,
+  currentTier,
+}: {
+  progress: ProgressSummary
+  currentTier: number
+}) {
+  const next = progress.tiers.find((tier) => !tier.unlocked)
+
+  return (
+    <section
+      aria-label="Tier ladder"
+      className="mt-8 border-t border-stone-200 pt-6 dark:border-stone-800"
+    >
+      <ol className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+        {progress.tiers.map((tier) => {
+          const current = tier.tier === currentTier
+          return (
+            <li
+              key={tier.tier}
+              aria-current={current ? 'step' : undefined}
+              className={
+                tier.unlocked
+                  ? 'text-stone-600 dark:text-stone-300'
+                  : 'text-stone-300 dark:text-stone-600'
+              }
+            >
+              <span aria-hidden="true">{tier.unlocked ? '\u25cf' : '\u25cb'}</span>{' '}
+              {tier.name}
+              {current ? <span className="sr-only"> (current)</span> : null}
+            </li>
+          )
+        })}
+      </ol>
+
+      {next ? (
+        <p className="mt-3 text-xs text-stone-400 dark:text-stone-500">
+          {next.name} opens after {next.medianThresholdMs} ms median and{' '}
+          {next.p95ThresholdMs} ms p95 with two clean passes in a row.
+          {next.failedAttempts >= 3
+            ? ` Cadence eased after ${next.failedAttempts} failed attempts.`
+            : null}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-stone-400 dark:text-stone-500">
+          Every tier is open.
+        </p>
+      )}
+    </section>
   )
 }
 

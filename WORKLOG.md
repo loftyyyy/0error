@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  114 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 69 tests in 15 files, oxlint clean,
+  118 tests pass, including the Postgres-backed acceptance test.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 70 tests in 15 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
+| `HEAD`    | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
+| `12635fd` | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
 | `6e3a630` | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
 | `9100031` | App-level jsdom flow test: a guest goes from an empty page through progress, three drills, session creation, eight keydowns, the queued telemetry POST, completion, the result panel, and the streamed coach note. It also asserts the raw `expected`/`actual` pairs reach the server. |
 | `34575e5` | Focused controls own their keys, and a pointer click on the theme switch returns focus so the next keystroke is typed instead of swallowed. |
@@ -83,6 +84,9 @@ commit `HEAD`; older rows keep their real hashes.
   then the stored class wins and is applied before the first paint.
 - **Controls own their keys.** The window listener skips focused inputs, buttons,
   links, and `contenteditable`, so Space activates a button instead of typing.
+- **The ladder speaks after the score.** Progress is fetched on bootstrap and
+  refreshed once completion lands, because that is the only moment tiers change.
+  A failed refresh keeps the last known ladder; the result never waits on it.
 - **No Redis.** It was provisioned but never read; removing it removed a
   dependency, a container, and a repository scan.
 
@@ -123,15 +127,19 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Tier ladder.** `/api/v1/progress` returns every tier with effective
-   thresholds, but the client only uses the highest unlocked tier. A small
-   ladder would show what is next and what the relaxed thresholds are.
-2. **Completion error path.** `App.test.tsx` covers the happy loop. A second
-   case should fail the telemetry POST and prove the result panel stays hidden,
-   the retry button rescores, and nothing is lost from the outbox.
-3. **Issuance edge cases in tests.** Unit and HTTP paths cover missing, reused,
-   and mixed-tier ids. Expiry and a foreign guest are exercised only by code,
-   not by a test, because they need clock control or a second guest.
+1. **Focus handoff between drills.** "Next drill" and "Try again" unmount the
+   button they were pressed on, so focus falls back to the body. Typing still
+   works because the window listener owns the keys, but a keyboard or screen
+   reader user loses their place and gets no announcement that a new drill is
+   ready. Focus the typing surface once the next drill exists and let the live
+   region name the tier.
+2. **Coach failure path.** `CoachNote` sets an `error` state when the stream
+   fails but renders nothing about it, which is silent rather than quiet. Decide
+   between a one-line note and a deliberate silence, then pin it with a test.
+3. **Offline bootstrap.** Drills are server-issued, so a cold load without the
+   API can only show the error panel. Either accept that and keep the copy
+   honest, or cache the last drill and its open session so a reconnect can score
+   what was typed offline. The outbox already survives; the session does not.
 4. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.

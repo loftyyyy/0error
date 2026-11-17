@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { countPendingBatches } from './features/telemetry/keystrokeQueue'
 import { drainOutbox } from './features/telemetry/telemetryBuffer'
 
 // React skips effects and warns unless this flag is set outside its own renderer.
@@ -20,6 +21,50 @@ const progress = {
       name: 'Home row',
       charset: 'fj ',
       unlocked: true,
+      consecutivePasses: 0,
+      failedAttempts: 0,
+      medianThresholdMs: 450,
+      p95ThresholdMs: 900,
+      unlockedAt: null,
+    },
+    {
+      tier: 1,
+      name: 'Top row',
+      charset: 'fj qwer ',
+      unlocked: false,
+      consecutivePasses: 0,
+      failedAttempts: 3,
+      medianThresholdMs: 383,
+      p95ThresholdMs: 765,
+      unlockedAt: null,
+    },
+    {
+      tier: 2,
+      name: 'Bottom row',
+      charset: 'fj qwer vbnm ',
+      unlocked: false,
+      consecutivePasses: 0,
+      failedAttempts: 0,
+      medianThresholdMs: 450,
+      p95ThresholdMs: 900,
+      unlockedAt: null,
+    },
+    {
+      tier: 3,
+      name: 'Punctuation',
+      charset: "fj qwer vbnm .,;'",
+      unlocked: false,
+      consecutivePasses: 0,
+      failedAttempts: 0,
+      medianThresholdMs: 450,
+      p95ThresholdMs: 900,
+      unlockedAt: null,
+    },
+    {
+      tier: 4,
+      name: 'Full sentences',
+      charset: 'abcdefghijklmnopqrstuvwxyz ',
+      unlocked: false,
       consecutivePasses: 0,
       failedAttempts: 0,
       medianThresholdMs: 450,
@@ -104,6 +149,9 @@ interface RecordedCall {
 
 let calls: RecordedCall[] = []
 
+/** When set, telemetry batches fail with this status, as a flaky network would. */
+let telemetryFailure: number | null = null
+
 function record(input: RequestInfo | URL, init?: RequestInit) {
   calls.push({
     url: String(input),
@@ -124,7 +172,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     return json({ ...drill, drillId: `drill-${drillIssued}` })
   }
   if (url.includes('/api/v1/auth/guest')) return json({ guestId: 'guest-1', token: 'token-1' })
-  if (url.includes('/telemetry')) return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
+  if (url.includes('/telemetry')) {
+    if (telemetryFailure !== null) return json({ error: 'temporarily unavailable' }, telemetryFailure)
+    return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
+  }
   if (url.includes('/complete')) return json(completion)
   if (url.includes('/feedback')) return eventStream(FEEDBACK)
   if (url.endsWith('/api/v1/sessions')) return json(session, 201)
@@ -163,6 +214,7 @@ beforeEach(async () => {
   window.localStorage.clear()
   calls = []
   drillIssued = 0
+  telemetryFailure = null
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -202,6 +254,13 @@ describe('App', () => {
     expect(bodyText()).toContain('One more clean pass unlocks your next tier.')
     expect(bodyText()).toContain('100.0%')
     expect(bodyText()).toContain('Coach')
+
+    // The ladder names every tier and the gate the next one still needs.
+    expect(container?.querySelector('section[aria-label="Tier ladder"]')).not.toBeNull()
+    expect(bodyText()).toContain('Full sentences')
+    expect(bodyText()).toContain(
+      'Top row opens after 383 ms median and 765 ms p95 with two clean passes in a row. Cadence eased after 3 failed attempts.',
+    )
 
     await waitFor(() => bodyText().includes('Keep it smooth.'), 'the coach note')
     expect(
@@ -243,5 +302,43 @@ describe('App', () => {
 
     expect(telemetry.map((event) => event.expected).join('')).toBe(DRILL_TEXT)
     expect(telemetry.map((event) => event.actual).join('')).toBe(DRILL_TEXT)
+  })
+
+  it('holds the result back until the queued keystrokes reach the server', async () => {
+    await waitFor(
+      () => shownDrill() === DRILL_TEXT,
+      'the drill text',
+    )
+
+    telemetryFailure = 503
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('The drill is not scored yet.'),
+      'the scoring error',
+    )
+    // No result is invented from a session the server has not fully seen.
+    expect(bodyText()).not.toContain('Gate passed.')
+    expect(calls.some((call) => call.url.includes('/complete'))).toBe(false)
+    // The outbox still holds the batch, so nothing typed is lost.
+    expect(await countPendingBatches('session-1')).toBe(1)
+
+    // The connection comes back; the retry rescores from the queued batch.
+    telemetryFailure = null
+    const retry = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+      button.textContent?.includes('Try again'),
+    )
+    expect(retry).toBeDefined()
+    await act(async () => {
+      retry?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(() => bodyText().includes('Gate passed.'), 'the rescored result')
+    expect(await countPendingBatches('session-1')).toBe(0)
+    expect(
+      calls.filter(
+        (call) => call.url.includes('/telemetry') && call.method === 'POST',
+      ).length,
+    ).toBeGreaterThan(1)
   })
 })

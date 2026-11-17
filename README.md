@@ -34,6 +34,11 @@ whatever pair or finger still makes you hesitate.
 - After a result, two quiet notes name the weakest transition and the least
   steady reach. Raw charts are deliberately absent. The gate outcome is also
   announced through a polite live region.
+- A short tier ladder follows the result: every tier, the one just practised
+  marked, and the next locked tier's effective median, p95, and any easing after
+  three failed attempts.
+- If the keystrokes cannot all reach the server, no result is invented. The
+  batches stay in the outbox and "Try again" rescores once the API answers.
 - A hesitation hint is announced for screen readers, and the guide's fade plus
   the coach cursor stop moving under `prefers-reduced-motion`.
 - Light and dark follow the operating system until the switch beside the tier
@@ -197,9 +202,10 @@ npm run build
 ```
 
 Most frontend tests are pure functions rendered to static markup. The `App` flow
-test, the keystroke capture test, and the hesitation test run in jsdom and
-dispatch real `keydown`, `blur`, and `paste` events, so the full guest loop and
-the window wiring are covered without a browser.
+tests, the keystroke capture test, and the hesitation test run in jsdom and
+dispatch real `keydown`, `blur`, and `paste` events. `App.test.tsx` covers the
+happy loop, the raw events that reach the server, and a telemetry outage where
+the result is held back until the queued batch is retried.
 
 ## Project layout
 
