@@ -120,6 +120,12 @@ function App() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-stone-50 px-6 py-16 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <div className="w-full max-w-2xl">
+        {/* Always mounted so the scored outcome is announced when it changes. */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {phase === 'result' && result
+            ? `${result.passed ? 'Gate passed.' : 'Not yet.'} ${result.consecutivePasses} of 2 consecutive passes.`
+            : ''}
+        </p>
         <header className="mb-16 flex items-center justify-between">
           <span className="text-sm font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
             0Error
@@ -408,7 +414,7 @@ function CoachNote({ sessionId }: { sessionId: string }) {
             ? 'Reading your run\u2026'
             : text}
         {state === 'streaming' && text !== '' ? (
-          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-stone-300 align-text-bottom dark:bg-stone-600" />
+          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-stone-300 align-text-bottom motion-reduce:animate-none dark:bg-stone-600" />
         ) : null}
       </p>
     </div>

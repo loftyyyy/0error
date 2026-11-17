@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
+| `HEAD`    | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
+| `6e3a630` | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
 | `9100031` | App-level jsdom flow test: a guest goes from an empty page through progress, three drills, session creation, eight keydowns, the queued telemetry POST, completion, the result panel, and the streamed coach note. It also asserts the raw `expected`/`actual` pairs reach the server. |
 | `34575e5` | Focused controls own their keys, and a pointer click on the theme switch returns focus so the next keystroke is typed instead of swallowed. |
 | `f99ebc4` | Remembered light/dark switch. Dark styles key on an `<html>` class, the choice is stored, an inline script applies it before first paint, and the OS setting is followed until the user chooses. |
@@ -73,7 +74,9 @@ commit `HEAD`; older rows keep their real hashes.
   characters keyed by the second one. Score is
   `0.55·error + 0.30·pause + 0.15·latency`; focus needs 2 attempts and 0.1.
 - **The guide is quiet.** It appears only after a real pause, names the key, the
-  Shift, and the finger, and hides while paused or scoring.
+  Shift, and the finger, and hides while paused or scoring. A polite live region
+  carries the same hint for screen readers, and the visual fade and coach cursor
+  stop moving under `prefers-reduced-motion`.
 - **Rhythm, not red ink.** Up to 400 ms reads smooth, up to 900 ms steady, beyond
   that hesitant.
 - **Theme is explicit.** System preference decides until the switch is pressed;
@@ -120,19 +123,16 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Accessibility polish.** The hesitation hint and gate outcome are visual
-   only. Announce the hint through a polite live region, and honour
-   `prefers-reduced-motion` for the guide's fade and the coach cursor.
-2. **Tier ladder.** `/api/v1/progress` returns every tier with effective
+1. **Tier ladder.** `/api/v1/progress` returns every tier with effective
    thresholds, but the client only uses the highest unlocked tier. A small
    ladder would show what is next and what the relaxed thresholds are.
-3. **Completion error path.** `App.test.tsx` covers the happy loop. A second
+2. **Completion error path.** `App.test.tsx` covers the happy loop. A second
    case should fail the telemetry POST and prove the result panel stays hidden,
    the retry button rescores, and nothing is lost from the outbox.
-4. **Issuance edge cases in tests.** Unit and HTTP paths cover missing, reused,
+3. **Issuance edge cases in tests.** Unit and HTTP paths cover missing, reused,
    and mixed-tier ids. Expiry and a foreign guest are exercised only by code,
    not by a test, because they need clock control or a second guest.
-5. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
+4. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.
 

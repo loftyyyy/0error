@@ -207,6 +207,13 @@ describe('App', () => {
     expect(
       container?.querySelector('button:not([aria-label])')?.textContent,
     ).toContain('Next drill')
+
+    // The outcome is announced politely, not only drawn.
+    const announced = Array.from(container?.querySelectorAll('[role="status"]') ?? [])
+      .map((node) => node.textContent ?? '')
+      .join(' ')
+    expect(announced).toContain('Gate passed.')
+    expect(announced).toContain('1 of 2 consecutive passes.')
   })
 
   it('sends the typed drill as raw events and completes the session', async () => {

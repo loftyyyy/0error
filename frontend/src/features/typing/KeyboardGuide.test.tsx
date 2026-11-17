@@ -42,6 +42,11 @@ describe('KeyboardGuide', () => {
     expect(markup).toContain(
       'aria-label="Keyboard hint: press ; with your right pinky finger and Shift"',
     )
+    // The hint is also announced politely, not only drawn.
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain(
+      '>Keyboard hint: press ; with your right pinky finger and Shift</p>',
+    )
   })
 
   it('names the finger for a plain letter', () => {
@@ -74,5 +79,7 @@ describe('KeyboardGuide', () => {
     expect(markup).not.toContain('fill-stone-900')
     expect(markup).not.toMatch(/finger|Hold shift/)
     expect(markup).toContain('aria-label="Keyboard guide"')
+    // Nothing is announced when no hesitation is showing.
+    expect(markup).toContain('<p role="status" aria-live="polite" class="sr-only"></p>')
   })
 })

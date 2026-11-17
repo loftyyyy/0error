@@ -32,7 +32,10 @@ whatever pair or finger still makes you hesitate.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
-  steady reach. Raw charts are deliberately absent.
+  steady reach. Raw charts are deliberately absent. The gate outcome is also
+  announced through a polite live region.
+- A hesitation hint is announced for screen readers, and the guide's fade plus
+  the coach cursor stop moving under `prefers-reduced-motion`.
 - Light and dark follow the operating system until the switch beside the tier
   name is pressed. That choice is remembered and applied before the first paint,
   so a dark session never flashes white.

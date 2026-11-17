@@ -53,11 +53,15 @@ export function KeyboardGuide({
 
   return (
     <div
-      className={`mt-12 flex flex-col items-center gap-2 transition-opacity duration-500 ${
+      className={`mt-12 flex flex-col items-center gap-2 transition-opacity duration-500 motion-reduce:transition-none ${
         visible ? (hesitating ? 'opacity-100' : 'opacity-40') : 'opacity-0'
       }`}
       aria-hidden={visible ? undefined : 'true'}
     >
+      {/* The drawing is visual; this is what a screen reader announces. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {visible && hesitating && highlight ? label : ''}
+      </p>
       <svg
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         role="img"
