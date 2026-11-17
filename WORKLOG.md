@@ -9,7 +9,7 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  118 tests pass, including the Postgres-backed acceptance test.
+  120 tests pass, including the Postgres-backed acceptance test.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 71 tests in 15 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Each drill now takes focus when it mounts, so a new drill after "Next drill" is announced instead of leaving focus on the body, and the drawn text gains a hidden plain paragraph the typing surface points at with `aria-describedby`. The App flow test also proves a failed coach stream leaves the scored result intact. |
+| `HEAD`    | A daily sweep marks sessions untouched for 24 hours as `ABANDONED` and sets `ended_at` to the last activity, so `ACTIVE` finally means "still open" and the partial active index stops growing with every closed tab. A Postgres integration test proves stale active rows change, fresh ones and completed ones do not, and the end time is the stop time rather than the sweep time. |
+| `40484eb` | Each drill now takes focus when it mounts, so a new drill after "Next drill" is announced instead of leaving focus on the body, and the drawn text gains a hidden plain paragraph the typing surface points at with `aria-describedby`. The App flow test also proves a failed coach stream leaves the scored result intact. |
 | `0b5e2c5` | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
 | `12635fd` | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
 | `6e3a630` | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
@@ -72,6 +73,9 @@ commit `HEAD`; older rows keep their real hashes.
   15%. An unlocked tier never closes.
 - **Warmup after any pause.** Three keystrokes after resume are stored but not
   scored; pauses also stop the clock.
+- **Abandoned is a real state.** A session untouched for a day becomes
+  `ABANDONED` with `ended_at` at its last update. Completion already refuses
+  anything that is not `ACTIVE`, so a swept session can never be scored late.
 - **Pair focus beats finger focus.** A pair is two consecutive expected
   characters keyed by the second one. Score is
   `0.55·error + 0.30·pause + 0.15·latency`; focus needs 2 attempts and 0.1.
@@ -132,15 +136,13 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Abandoned sessions.** `sessions.status` allows `ABANDONED`, but nothing ever
-   sets it. A guest who closes the tab mid-drill leaves an `ACTIVE` row forever,
-   which weakens the meaning of "active" and keeps the partial index larger than
-   it needs to be. A scheduled sweep should mark sessions untouched for a day as
-   `ABANDONED` and set `ended_at`.
-2. **Offline bootstrap.** Drills are server-issued, so a cold load without the
+1. **Offline bootstrap.** Drills are server-issued, so a cold load without the
    API can only show the error panel. Either accept that and keep the copy
    honest, or cache the last drill and its open session so a reconnect can score
    what was typed offline. The outbox already survives; the session does not.
+2. **Ladder for the tier in progress.** The result ladder shows passes for the
+   gate line only; the ladder itself does not say "1 of 2" beside the current
+   tier. Worth folding in if the panel starts to feel repetitive.
 3. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.

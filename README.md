@@ -142,7 +142,9 @@ configured, deterministic sentences otherwise. The prompt sees the session
 metrics, the focus pairs, and the weak reach.
 
 **Retention.** Raw keystrokes are purged after 30 days. Session aggregates, pair
-aggregates, and finger aggregates are kept indefinitely.
+aggregates, and finger aggregates are kept indefinitely. A daily sweep marks
+sessions untouched for a day as `ABANDONED`, with `ended_at` set to the last
+activity, so `ACTIVE` keeps meaning "still open".
 
 ## API
 
