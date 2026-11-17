@@ -152,6 +152,9 @@ let calls: RecordedCall[] = []
 /** When set, telemetry batches fail with this status, as a flaky network would. */
 let telemetryFailure: number | null = null
 
+/** When true, the coaching stream is unavailable. */
+let feedbackFailure = false
+
 function record(input: RequestInfo | URL, init?: RequestInit) {
   calls.push({
     url: String(input),
@@ -177,7 +180,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   }
   if (url.includes('/complete')) return json(completion)
-  if (url.includes('/feedback')) return eventStream(FEEDBACK)
+  if (url.includes('/feedback')) {
+    if (feedbackFailure) return json({ error: 'temporarily unavailable' }, 503)
+    return eventStream(FEEDBACK)
+  }
   if (url.endsWith('/api/v1/sessions')) return json(session, 201)
 
   throw new Error(`Unexpected fetch: ${init?.method ?? 'GET'} ${url}`)
@@ -215,6 +221,7 @@ beforeEach(async () => {
   calls = []
   drillIssued = 0
   telemetryFailure = null
+  feedbackFailure = false
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -247,6 +254,13 @@ describe('App', () => {
       'the drill text',
     )
     expect(bodyText()).toContain('Home row')
+
+    // The typing surface takes focus, so a new drill is announced with its text
+    // instead of leaving focus on the body after the previous button unmounted.
+    const surface = container?.querySelector('[role="application"]')
+    expect(document.activeElement).toBe(surface)
+    expect(surface?.getAttribute('aria-describedby')).toBe('drill-text-session-1')
+    expect(container?.querySelector('#drill-text-session-1')?.textContent).toBe(DRILL_TEXT)
 
     for (const key of DRILL_TEXT) await press(key)
 
@@ -340,5 +354,26 @@ describe('App', () => {
         (call) => call.url.includes('/telemetry') && call.method === 'POST',
       ).length,
     ).toBeGreaterThan(1)
+  })
+
+  it('keeps the scored result when the coach stream fails', async () => {
+    await waitFor(
+      () => shownDrill() === DRILL_TEXT,
+      'the drill text',
+    )
+
+    feedbackFailure = true
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Gate passed.'), 'the scored result')
+    await waitFor(
+      () =>
+        bodyText().includes(
+          'Coaching is unavailable right now. Your metrics are saved.',
+        ),
+      'the quiet coach note',
+    )
+    // Coaching is not on the critical path; the numbers still stand.
+    expect(bodyText()).toContain('100.0%')
   })
 })

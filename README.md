@@ -39,6 +39,11 @@ whatever pair or finger still makes you hesitate.
   three failed attempts.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
+- Coaching is never on the critical path: a failed stream leaves the scored
+  result in place and says so in one line.
+- Each drill takes focus when it appears and the target text is also exposed as
+  a hidden plain paragraph, so a screen reader reads what to type while the
+  colored, per-character drawing stays out of the announcement.
 - A hesitation hint is announced for screen readers, and the guide's fade plus
   the coach cursor stop moving under `prefers-reduced-motion`.
 - Light and dark follow the operating system until the switch beside the tier

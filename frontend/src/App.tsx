@@ -242,6 +242,14 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
     onComplete,
   })
 
+  // "Next drill" and "Try again" unmount the button that was pressed, so park
+  // focus on the typing surface instead of dropping it back onto the body.
+  useEffect(() => {
+    containerRef.current?.focus({ preventScroll: true })
+  }, [containerRef])
+
+  const descriptionId = `drill-text-${drill.sessionId}`
+
   const progress = snapshot.length === 0 ? 0 : (snapshot.index / snapshot.length) * 100
   const isPaused = snapshot.status === 'paused'
   const isComplete = snapshot.status === 'complete'
@@ -255,9 +263,15 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
       ref={containerRef}
       role="application"
       aria-label="Typing practice. Type the text shown."
+      aria-describedby={descriptionId}
       tabIndex={0}
       className="cursor-text rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-stone-300 dark:focus-visible:ring-stone-700"
     >
+      {/* The drawn text is split into per-character spans, so screen readers
+          get the drill as one plain paragraph instead. */}
+      <p id={descriptionId} className="sr-only">
+        {drill.text}
+      </p>
       <p
         aria-hidden="true"
         className="font-mono text-3xl leading-[1.9] tracking-wide break-words select-none sm:text-4xl"

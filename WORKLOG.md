@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   118 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 70 tests in 15 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 71 tests in 15 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
+| `HEAD`    | Each drill now takes focus when it mounts, so a new drill after "Next drill" is announced instead of leaving focus on the body, and the drawn text gains a hidden plain paragraph the typing surface points at with `aria-describedby`. The App flow test also proves a failed coach stream leaves the scored result intact. |
+| `0b5e2c5` | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
 | `12635fd` | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
 | `6e3a630` | Server-owned drill text. Every served drill gets a short-lived issuance id; session creation cites three of them and the server derives tier, charset, length, source, and the composed text. Telemetry `expected` characters and correctness are rewritten from the persisted text, so a client cannot choose what it is scored against. Issuances are single-use, same-tier, owned, and expire in 10 minutes; expired rows are purged daily. |
 | `9100031` | App-level jsdom flow test: a guest goes from an empty page through progress, three drills, session creation, eight keydowns, the queued telemetry POST, completion, the result panel, and the streamed coach note. It also asserts the raw `expected`/`actual` pairs reach the server. |
@@ -78,6 +79,10 @@ commit `HEAD`; older rows keep their real hashes.
   Shift, and the finger, and hides while paused or scoring. A polite live region
   carries the same hint for screen readers, and the visual fade and coach cursor
   stop moving under `prefers-reduced-motion`.
+- **Each drill takes focus.** The result button that starts the next drill
+  unmounts, so the drill surface focuses itself on mount and points at a hidden
+  plain copy of the text. A screen reader then hears the target text; the drawn
+  per-character spans stay `aria-hidden` so color and rhythm are not read out.
 - **Rhythm, not red ink.** Up to 400 ms reads smooth, up to 900 ms steady, beyond
   that hesitant.
 - **Theme is explicit.** System preference decides until the switch is pressed;
@@ -127,20 +132,16 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Focus handoff between drills.** "Next drill" and "Try again" unmount the
-   button they were pressed on, so focus falls back to the body. Typing still
-   works because the window listener owns the keys, but a keyboard or screen
-   reader user loses their place and gets no announcement that a new drill is
-   ready. Focus the typing surface once the next drill exists and let the live
-   region name the tier.
-2. **Coach failure path.** `CoachNote` sets an `error` state when the stream
-   fails but renders nothing about it, which is silent rather than quiet. Decide
-   between a one-line note and a deliberate silence, then pin it with a test.
-3. **Offline bootstrap.** Drills are server-issued, so a cold load without the
+1. **Abandoned sessions.** `sessions.status` allows `ABANDONED`, but nothing ever
+   sets it. A guest who closes the tab mid-drill leaves an `ACTIVE` row forever,
+   which weakens the meaning of "active" and keeps the partial index larger than
+   it needs to be. A scheduled sweep should mark sessions untouched for a day as
+   `ABANDONED` and set `ended_at`.
+2. **Offline bootstrap.** Drills are server-issued, so a cold load without the
    API can only show the error panel. Either accept that and keep the copy
    honest, or cache the last drill and its open session so a reconnect can score
    what was typed offline. The outbox already survives; the session does not.
-4. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
+3. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.
 
