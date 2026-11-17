@@ -214,3 +214,6 @@ frontend/
 - Without `OPENAI_API_KEY` the app is fully functional: drills come from the
   static pool and coaching from the deterministic fallback.
 - Postgres is the only service required to run. Nothing is cached out of process.
+
+The build history, the reasoning behind each decision, and the remaining work
+live in [WORKLOG.md](WORKLOG.md).
