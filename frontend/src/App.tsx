@@ -13,6 +13,7 @@ import { KeyboardGuide } from './features/typing/KeyboardGuide'
 import { characterClass } from './features/typing/characterClass'
 import { useHesitation } from './features/typing/useHesitation'
 import { useKeystrokeCapture } from './features/typing/useKeystrokeCapture'
+import { ThemeToggle } from './features/theme/ThemeToggle'
 
 function newClientSessionId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -122,13 +123,16 @@ function App() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-stone-50 px-6 py-16 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <div className="w-full max-w-2xl">
-        <header className="mb-16 flex items-baseline justify-between">
+        <header className="mb-16 flex items-center justify-between">
           <span className="text-sm font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
             0Error
           </span>
-          <span className="text-xs text-stone-400 dark:text-stone-500">
-            {drill?.tierName ?? 'your pace'}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-stone-400 dark:text-stone-500">
+              {drill?.tierName ?? 'your pace'}
+            </span>
+            <ThemeToggle />
+          </div>
         </header>
 
         {phase === 'loading' ? <LoadingDrill /> : null}

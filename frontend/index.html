@@ -8,7 +8,19 @@
       name="description"
       content="0Error is a calm, minimal touch-typing tutor. Learn the home row first."
     />
-    <title>0Error — learn to touch-type</title>
+    <title>0Error - learn to touch-type</title>
+    <script>
+      // Applied before the first paint so a dark session never flashes light.
+      try {
+        var storedTheme = localStorage.getItem('0error-theme')
+        var prefersDark =
+          storedTheme === 'dark' ||
+          (storedTheme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', prefersDark)
+      } catch (error) {
+        // Storage or matchMedia may be blocked; the light default stands.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -30,6 +30,9 @@ whatever pair or finger still makes you hesitate.
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
   steady reach. Raw charts are deliberately absent.
+- Light and dark follow the operating system until the switch beside the tier
+  name is pressed. That choice is remembered and applied before the first paint,
+  so a dark session never flashes white.
 
 ## Stack
 
