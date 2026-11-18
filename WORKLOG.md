@@ -155,8 +155,12 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 Live smoke (backend + Postgres, no browser): with the API on `:8080`, a `POST`
 to `/api/v1/auth/guest` returned a token, `/api/v1/progress` returned five tiers,
 `/api/v1/drills/next?tier=0` returned a `STATIC` home-row drill, and a burst of
-new sign-ins ended in `429` with `Retry-After: 2`. The frontend dev server is
-not needed for that path.
+new sign-ins ended in `429` with `Retry-After: 2`.
+
+Browser check (backend + Vite at `http://localhost:5173/`): the first drill
+rendered, the idle hint lit the `a` key and named the left pinky, and the theme
+switch flipped the page to dark with a light active key. Screenshots from that
+pass are under `backend/.openchamber/screenshots/`.
 
 ## Open work
 
