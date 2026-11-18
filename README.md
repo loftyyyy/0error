@@ -39,6 +39,9 @@ whatever pair or finger still makes you hesitate.
   three failed attempts.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
+- A cold load needs the API, because drills are issued rather than bundled. When
+  the server is unreachable the panel says so in plain words instead of echoing
+  a browser's "Failed to fetch".
 - Coaching is never on the critical path: a failed stream leaves the scored
   result in place and says so in one line.
 - Each drill takes focus when it appears and the target text is also exposed as

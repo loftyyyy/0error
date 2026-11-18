@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   121 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 72 tests in 15 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 73 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Telemetry is refused once a session is closed. Late batches now get `409` instead of moving aggregates away from the gate decision that already read them; the client treats that status as done and drops the batch so the queue never blocks. Unit tests cover the refusal on both sides. |
+| `HEAD`    | A dropped connection now says "The server is not reachable. Check your connection and try again." instead of passing a browser's "Failed to fetch" into the error panel. The wrapped fetch is used for guest sign-in and every authenticated request, including the retry after a `401`, and a unit test pins the wording. |
+| `2746ba9` | Telemetry is refused once a session is closed. Late batches now get `409` instead of moving aggregates away from the gate decision that already read them; the client treats that status as done and drops the batch so the queue never blocks. Unit tests cover the refusal on both sides. |
 | `9be18d1` | A daily sweep marks sessions untouched for 24 hours as `ABANDONED` and sets `ended_at` to the last activity, so `ACTIVE` finally means "still open" and the partial active index stops growing with every closed tab. A Postgres integration test proves stale active rows change, fresh ones and completed ones do not, and the end time is the stop time rather than the sweep time. |
 | `40484eb` | Each drill now takes focus when it mounts, so a new drill after "Next drill" is announced instead of leaving focus on the body, and the drawn text gains a hidden plain paragraph the typing surface points at with `aria-describedby`. The App flow test also proves a failed coach stream leaves the scored result intact. |
 | `0b5e2c5` | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
@@ -81,6 +82,10 @@ commit `HEAD`; older rows keep their real hashes.
   session leaves `ACTIVE`, which keeps stored aggregates identical to the ones
   the gate judged. A `409` on a telemetry batch means "done", not "retry", so
   the outbox drops it.
+- **A first load needs the server.** Drills are issued and sessions are created
+  server-side, so there is nothing honest to practise offline. The client says
+  the server is unreachable in plain words; the outbox still protects a drill
+  that was already under way.
 - **Pair focus beats finger focus.** A pair is two consecutive expected
   characters keyed by the second one. Score is
   `0.55·error + 0.30·pause + 0.15·latency`; focus needs 2 attempts and 0.1.
@@ -141,13 +146,12 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Offline bootstrap.** Drills are server-issued, so a cold load without the
-   API can only show the error panel. Either accept that and keep the copy
-   honest, or cache the last drill and its open session so a reconnect can score
-   what was typed offline. The outbox already survives; the session does not.
-2. **Ladder for the tier in progress.** The result ladder shows passes for the
-   gate line only; the ladder itself does not say "1 of 2" beside the current
-   tier. Worth folding in if the panel starts to feel repetitive.
+1. **Unlock copy names the tier.** The result panel says "Tier 2 unlocked"; the
+   ladder now knows every name, so it could say "Top row unlocked" and drop the
+   off-by-one arithmetic from the sentence.
+2. **Hosted abuse guard.** Guest sign-in creates a `users` row per call and has
+   no rate limit. That is fine on a laptop and would matter on a public host.
+   A small in-process limiter would do, since Postgres is the only dependency.
 3. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.

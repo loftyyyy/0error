@@ -79,7 +79,7 @@ export function ensureGuest(): Promise<GuestIdentity> {
 }
 
 async function requestGuest(): Promise<GuestIdentity> {
-  const response = await fetch(apiUrl('/api/v1/auth/guest'), {
+  const response = await reachable(apiUrl('/api/v1/auth/guest'), {
     method: 'POST',
     headers: { Accept: 'application/json' },
   })
@@ -94,6 +94,19 @@ async function requestGuest(): Promise<GuestIdentity> {
   return { guestId: body.guestId, token: body.token }
 }
 
+/**
+ * A dropped connection surfaces as a bare "Failed to fetch", which tells a
+ * typist nothing. Every request goes through this so the panel can say what
+ * happened and what to do about it.
+ */
+async function reachable(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch {
+    throw new Error('The server is not reachable. Check your connection and try again.')
+  }
+}
+
 function withToken(init: RequestInit, token: string): RequestInit {
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
@@ -106,10 +119,10 @@ function withToken(init: RequestInit, token: string): RequestInit {
  */
 export async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const identity = await ensureGuest()
-  const response = await fetch(apiUrl(path), withToken(init, identity.token))
+  const response = await reachable(apiUrl(path), withToken(init, identity.token))
   if (response.status !== 401) return response
 
   clearGuestIdentity()
   const refreshed = await ensureGuest()
-  return fetch(apiUrl(path), withToken(init, refreshed.token))
+  return reachable(apiUrl(path), withToken(init, refreshed.token))
 }
