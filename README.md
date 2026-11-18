@@ -160,9 +160,18 @@ All `/api/v1` endpoints except guest token creation require
 `Authorization: Bearer <guest token>`. Sessions and reports are scoped to the
 guest that owns them. The actuator probes are public.
 
+**Guest sign-in is paced.** A new guest writes a row, so one address may create
+30 in a burst and then one every two seconds. Over that, the endpoint answers
+`429` with `Retry-After` and the browser asks the visitor to wait. Rotating an
+existing guest's token is never limited. The counter lives in the process: it
+resets on restart and does not coordinate across instances, which is enough to
+stop a trivial loop without adding a dependency. Behind a proxy every client
+shares the proxy's address, so the burst is sized for a room rather than one
+person.
+
 | Method | Path                                   | Purpose                                             |
 | ------ | -------------------------------------- | --------------------------------------------------- |
-| POST   | `/api/v1/auth/guest`                   | Create or rotate a guest token                      |
+| POST   | `/api/v1/auth/guest`                   | Create or rotate a guest token; `429` when paced    |
 | GET    | `/api/v1/drills/next?tier=&exclude=`   | Next drill; `403` when the tier is locked           |
 | POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |

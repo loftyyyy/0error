@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  121 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 74 tests in 16 files, oxlint clean,
+  131 tests pass, including the Postgres-backed acceptance test.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 75 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
+| `HEAD`    | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
+| `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
 | `56073c2` | A dropped connection now says "The server is not reachable. Check your connection and try again." instead of passing a browser's "Failed to fetch" into the error panel. The wrapped fetch is used for guest sign-in and every authenticated request, including the retry after a `401`, and a unit test pins the wording. |
 | `2746ba9` | Telemetry is refused once a session is closed. Late batches now get `409` instead of moving aggregates away from the gate decision that already read them; the client treats that status as done and drops the batch so the queue never blocks. Unit tests cover the refusal on both sides. |
 | `9be18d1` | A daily sweep marks sessions untouched for 24 hours as `ABANDONED` and sets `ended_at` to the last activity, so `ACTIVE` finally means "still open" and the partial active index stops growing with every closed tab. A Postgres integration test proves stale active rows change, fresh ones and completed ones do not, and the end time is the stop time rather than the sweep time. |
@@ -110,6 +111,11 @@ commit `HEAD`; older rows keep their real hashes.
 - **Names, not numbers, in the result.** The unlock sentence reads the tier name
   from the ladder; "Tier N" stays only as the fallback for a missing summary, so
   the copy never contradicts the ladder beside it.
+- **Sign-in is paced in the process.** New guests are the only unauthenticated
+  write in the API, so one address gets 30 in a burst and one per two seconds
+  after that. Rotating a token is untouched. The bucket resets on restart and is
+  per instance: a guard that needs no new dependency, not a distributed quota.
+  The burst is sized for a class behind one proxy address.
 - **No Redis.** It was provisioned but never read; removing it removed a
   dependency, a container, and a repository scan.
 
@@ -150,10 +156,7 @@ and stopped with `pg_ctl -D <data> stop -m fast`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Hosted abuse guard.** Guest sign-in creates a `users` row per call and has
-   no rate limit. That is fine on a laptop and would matter on a public host.
-   A small in-process limiter would do, since Postgres is the only dependency.
-2. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
+1. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.
 

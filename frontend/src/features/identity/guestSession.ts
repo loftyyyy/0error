@@ -83,6 +83,9 @@ async function requestGuest(): Promise<GuestIdentity> {
     method: 'POST',
     headers: { Accept: 'application/json' },
   })
+  if (response.status === 429) {
+    throw new Error('Too many new visitors from this network. Wait a moment and try again.')
+  }
   if (!response.ok) {
     throw new Error(`Guest sign-in failed (${response.status})`)
   }

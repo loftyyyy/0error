@@ -29,7 +29,7 @@ public class GuestTokenService {
 		boolean hasId = existingGuestId != null;
 		boolean hasToken = existingToken != null && !existingToken.isBlank();
 
-		if (!hasId && !hasToken) {
+		if (isNewGuest(existingGuestId, existingToken)) {
 			return create();
 		}
 		if (!hasId || !hasToken) {
@@ -37,6 +37,14 @@ public class GuestTokenService {
 					"X-Guest-Id and X-Guest-Token must be supplied together"));
 		}
 		return rotate(existingGuestId, existingToken);
+	}
+
+	/**
+	 * True when a request asks for a brand-new guest, which is the only path that
+	 * writes a row without proving ownership of one.
+	 */
+	public static boolean isNewGuest(UUID guestId, String guestToken) {
+		return guestId == null && (guestToken == null || guestToken.isBlank());
 	}
 
 	private Mono<GuestTokenResponse> create() {
