@@ -152,6 +152,12 @@ can be started with
 `pg_ctl -D <data> -o "-p 55434 -c listen_addresses=localhost" -l server.log start`
 and stopped with `pg_ctl -D <data> stop -m fast`.
 
+Live smoke (backend + Postgres, no browser): with the API on `:8080`, a `POST`
+to `/api/v1/auth/guest` returned a token, `/api/v1/progress` returned five tiers,
+`/api/v1/drills/next?tier=0` returned a `STATIC` home-row drill, and a burst of
+new sign-ins ended in `429` with `Retry-After: 2`. The frontend dev server is
+not needed for that path.
+
 ## Open work
 
 None of these blocks the app; they are the next things worth doing, in order.
