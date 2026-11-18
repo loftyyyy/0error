@@ -112,6 +112,11 @@ first-attempt per position, so a correction cannot erase an error. Cadence is th
 gap between consecutive scored keys; gaps over 1500 ms are excluded and counted
 as hesitations.
 
+**Closed sessions are final.** Telemetry is accepted only while a session is
+`ACTIVE`. A batch that arrives after completion gets `409`, and the client drops
+it rather than retrying forever, so the stored aggregates can never drift away
+from the gate decision that was made from them.
+
 **Unlock gate.** Accuracy at least 96%, median inter-key gap at most 450 ms, p95
 at most 900 ms, at least 120 scored keystrokes, and two consecutive passes. Every
 third failed attempt relaxes both cadence thresholds by 15%. An unlocked tier is

@@ -48,6 +48,14 @@ public class TelemetryIngestService {
 				.switchIfEmpty(Mono.error(new ResponseStatusException(
 						HttpStatus.NOT_FOUND, "Session not found")))
 				.flatMap(session -> {
+					// A closed session's aggregates were already judged by the
+					// gate; late keystrokes would only make the stored numbers
+					// disagree with the decision that was made from them.
+					if (!"ACTIVE".equals(session.status())) {
+						return Mono.error(new ResponseStatusException(
+								HttpStatus.CONFLICT, "Session is already " + session.status()));
+					}
+
 					// Both the target character and correctness are derived from
 					// the server-issued drill text, so a client cannot rewrite
 					// what it was asked to type. The client's expected/correct

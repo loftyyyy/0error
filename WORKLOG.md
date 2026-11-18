@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  120 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 71 tests in 15 files, oxlint clean,
+  121 tests pass, including the Postgres-backed acceptance test.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 72 tests in 15 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | A daily sweep marks sessions untouched for 24 hours as `ABANDONED` and sets `ended_at` to the last activity, so `ACTIVE` finally means "still open" and the partial active index stops growing with every closed tab. A Postgres integration test proves stale active rows change, fresh ones and completed ones do not, and the end time is the stop time rather than the sweep time. |
+| `HEAD`    | Telemetry is refused once a session is closed. Late batches now get `409` instead of moving aggregates away from the gate decision that already read them; the client treats that status as done and drops the batch so the queue never blocks. Unit tests cover the refusal on both sides. |
+| `9be18d1` | A daily sweep marks sessions untouched for 24 hours as `ABANDONED` and sets `ended_at` to the last activity, so `ACTIVE` finally means "still open" and the partial active index stops growing with every closed tab. A Postgres integration test proves stale active rows change, fresh ones and completed ones do not, and the end time is the stop time rather than the sweep time. |
 | `40484eb` | Each drill now takes focus when it mounts, so a new drill after "Next drill" is announced instead of leaving focus on the body, and the drawn text gains a hidden plain paragraph the typing surface points at with `aria-describedby`. The App flow test also proves a failed coach stream leaves the scored result intact. |
 | `0b5e2c5` | Tier ladder after a score: every tier, the one just practised marked, and the next locked tier's effective median and p95 plus any easing after three failures. The completion error path is now tested — a failing telemetry POST holds the result back, keeps the batch in the outbox, and the retry rescores from it. Issuance expiry, a foreign guest, duplicate ids, and mixed tiers have unit tests. |
 | `12635fd` | Accessibility polish. The hesitation hint is also a polite live region, the scored gate outcome is announced from an always-mounted status region, and the guide's fade plus the coach cursor stop moving under `prefers-reduced-motion`. |
@@ -76,6 +77,10 @@ commit `HEAD`; older rows keep their real hashes.
 - **Abandoned is a real state.** A session untouched for a day becomes
   `ABANDONED` with `ended_at` at its last update. Completion already refuses
   anything that is not `ACTIVE`, so a swept session can never be scored late.
+- **Closed sessions take no more telemetry.** Ingest answers `409` once a
+  session leaves `ACTIVE`, which keeps stored aggregates identical to the ones
+  the gate judged. A `409` on a telemetry batch means "done", not "retry", so
+  the outbox drops it.
 - **Pair focus beats finger focus.** A pair is two consecutive expected
   characters keyed by the second one. Score is
   `0.55·error + 0.30·pause + 0.15·latency`; focus needs 2 attempts and 0.1.

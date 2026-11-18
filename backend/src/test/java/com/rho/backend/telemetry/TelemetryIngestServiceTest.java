@@ -189,8 +189,34 @@ class TelemetryIngestServiceTest {
 				.containsExactly(true, true, true, true, false);
 	}
 
+	@Test
+	void telemetryForAClosedSessionIsRefused() {
+		givenSessionWithStatus("COMPLETED", "asdf");
+
+		StepVerifier.create(service.ingest(USER_ID, SESSION_ID,
+						new TelemetryBatchRequest("b", SESSION_ID, Instant.now(),
+								List.of(keystroke(0)))))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					ResponseStatusException status = (ResponseStatusException) error;
+					assertThat(status.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(status.getReason()).isEqualTo("Session is already COMPLETED");
+				})
+				.verify();
+
+		verify(writer, never()).insertIgnoringDuplicates(any(), anyList());
+		verify(metrics, never()).recompute(any());
+	}
+
 	private void givenOwnedSession() {
 		givenOwnedSession("a".repeat(64));
+	}
+
+	private void givenSessionWithStatus(String status, String drillText) {
+		TypingSession session = new TypingSession(
+				SESSION_ID, USER_ID, UUID.randomUUID(), 0, "STATIC", drillText.length(), "asdfjkl;",
+				drillText, status, OffsetDateTime.now(), null, 0, 0, null, null, null, 0, null, null);
+		when(sessions.findByIdAndUserId(SESSION_ID, USER_ID)).thenReturn(Mono.just(session));
 	}
 
 	private void givenOwnedSession(String drillText) {

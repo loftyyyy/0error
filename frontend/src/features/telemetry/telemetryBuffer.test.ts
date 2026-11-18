@@ -59,4 +59,25 @@ describe('flushSession', () => {
     await expect(flushSession('session-2', '', 1)).resolves.toBe(false)
     expect(await countPendingBatches('session-2')).toBe(1)
   })
+
+  it('drops a batch for a session the server has already closed', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 409 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { enqueueBatch, countPendingBatches } = await import('./keystrokeQueue')
+    const { flushSession } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-3',
+      sessionId: 'session-3',
+      createdAt: 1,
+      events,
+    })
+
+    // 409 means the batch lost the race with completion; retrying it forever
+    // would only block the queue.
+    await expect(flushSession('session-3', '', 1)).resolves.toBe(true)
+    expect(await countPendingBatches('session-3')).toBe(0)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })
