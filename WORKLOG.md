@@ -9,7 +9,7 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  131 tests pass, including the Postgres-backed acceptance test.
+  133 tests pass, including the Postgres-backed acceptance test.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 75 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
+| `HEAD`    | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
+| `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
 | `56073c2` | A dropped connection now says "The server is not reachable. Check your connection and try again." instead of passing a browser's "Failed to fetch" into the error panel. The wrapped fetch is used for guest sign-in and every authenticated request, including the retry after a `401`, and a unit test pins the wording. |
 | `2746ba9` | Telemetry is refused once a session is closed. Late batches now get `409` instead of moving aggregates away from the gate decision that already read them; the client treats that status as done and drops the batch so the queue never blocks. Unit tests cover the refusal on both sides. |
@@ -116,6 +117,11 @@ commit `HEAD`; older rows keep their real hashes.
   after that. Rotating a token is untouched. The bucket resets on restart and is
   per instance: a guard that needs no new dependency, not a distributed quota.
   The burst is sized for a class behind one proxy address.
+- **Empty guests expire, used ones do not.** A guest row with no session and a
+  month of silence is swept; one that started any drill keeps its row forever,
+  because its aggregates are the record. The cutoff reads `updated_at`, so token
+  rotation counts as activity. This pairs with pacing: creation is capped, and
+  the rows that slip through do not accumulate.
 - **No Redis.** It was provisioned but never read; removing it removed a
   dependency, a container, and a repository scan.
 
@@ -169,6 +175,12 @@ None of these blocks the app; they are the next things worth doing, in order.
 1. **Blocked by environment.** No `OPENAI_API_KEY`, so live drill generation and
    model coaching are unverified; the fallbacks are. No Docker, so
    `docker compose up -d postgres` was never executed here.
+2. **Shared pacing, only if hosted on more than one instance.** The sign-in
+   bucket is per process, so two instances each allow the full burst. A shared
+   counter in Postgres would fix it; a single instance does not need one.
+3. **A progress history view.** `/api/v1/progress` already carries tiers and
+   timestamps, but the UI only shows the ladder after a score. This is a
+   product idea, not a gap in the loop.
 
 ## Housekeeping
 

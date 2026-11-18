@@ -152,7 +152,10 @@ metrics, the focus pairs, and the weak reach.
 **Retention.** Raw keystrokes are purged after 30 days. Session aggregates, pair
 aggregates, and finger aggregates are kept indefinitely. A daily sweep marks
 sessions untouched for a day as `ABANDONED`, with `ended_at` set to the last
-activity, so `ACTIVE` keeps meaning "still open".
+activity, so `ACTIVE` keeps meaning "still open". A second sweep removes guests
+that have no session at all and no activity for 30 days: sign-in writes a row,
+and a browser opened once should not stay in the table forever. Guests that ever
+started a drill keep their row, because their session carries aggregates.
 
 ## API
 
