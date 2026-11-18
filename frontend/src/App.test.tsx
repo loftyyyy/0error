@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import type { SessionCompletion } from './features/sessions/sessionApi'
 import { countPendingBatches } from './features/telemetry/keystrokeQueue'
 import { drainOutbox } from './features/telemetry/telemetryBuffer'
 
@@ -96,7 +97,7 @@ const session = {
   startedAt: new Date().toISOString(),
 }
 
-const completion = {
+const completion: SessionCompletion = {
   sessionId: 'session-1',
   tier: 0,
   status: 'COMPLETED',
@@ -118,6 +119,9 @@ const completion = {
   minimumKeystrokes: 120,
   failures: [],
 }
+
+/** The completion the fake server answers with; one test swaps in an unlock. */
+let completionResponse: SessionCompletion = completion
 
 const FEEDBACK = 'event: token\ndata: Keep it smooth.\n\nevent: done\ndata: [DONE]\n\n'
 
@@ -179,7 +183,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     if (telemetryFailure !== null) return json({ error: 'temporarily unavailable' }, telemetryFailure)
     return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   }
-  if (url.includes('/complete')) return json(completion)
+  if (url.includes('/complete')) return json(completionResponse)
   if (url.includes('/feedback')) {
     if (feedbackFailure) return json({ error: 'temporarily unavailable' }, 503)
     return eventStream(FEEDBACK)
@@ -222,6 +226,7 @@ beforeEach(async () => {
   drillIssued = 0
   telemetryFailure = null
   feedbackFailure = false
+  completionResponse = completion
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -375,5 +380,18 @@ describe('App', () => {
     )
     // Coaching is not on the critical path; the numbers still stand.
     expect(bodyText()).toContain('100.0%')
+  })
+
+  it('names the tier an unlock opens', async () => {
+    completionResponse = { ...completion, consecutivePasses: 2, unlockedTier: 1 }
+
+    await waitFor(
+      () => shownDrill() === DRILL_TEXT,
+      'the drill text',
+    )
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Top row unlocked.'), 'the unlock line')
+    expect(bodyText()).not.toContain('Tier 2 unlocked.')
   })
 })

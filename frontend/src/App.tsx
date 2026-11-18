@@ -353,7 +353,9 @@ function ResultPanel({
 
       {result.unlockedTier !== null ? (
         <p className="mt-3 text-sm text-stone-600 dark:text-stone-300">
-          Tier {result.unlockedTier + 1} unlocked. Your next drill moves on.
+          {progress?.tiers.find((tier) => tier.tier === result.unlockedTier)?.name ??
+            `Tier ${result.unlockedTier + 1}`}{' '}
+          unlocked. Your next drill moves on.
         </p>
       ) : result.passed ? (
         <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
