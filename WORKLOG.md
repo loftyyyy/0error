@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   133 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 75 tests in 16 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 76 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
+| `HEAD`    | The result panel no longer promises a next tier when nothing above the practised one is locked. A pass on the last tier (or with the whole ladder open) reads "Every tier is open. Keep the rhythm." instead of "One more clean pass unlocks your next tier.", which contradicted the ladder directly below it. An App test completes the curriculum and asserts both the sentence and the absence of the false promise. |
+| `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
 | `56073c2` | A dropped connection now says "The server is not reachable. Check your connection and try again." instead of passing a browser's "Failed to fetch" into the error panel. The wrapped fetch is used for guest sign-in and every authenticated request, including the retry after a `401`, and a unit test pins the wording. |
@@ -112,6 +113,9 @@ commit `HEAD`; older rows keep their real hashes.
 - **Names, not numbers, in the result.** The unlock sentence reads the tier name
   from the ladder; "Tier N" stays only as the fallback for a missing summary, so
   the copy never contradicts the ladder beside it.
+- **No promise of a tier that cannot open.** The result panel only says a clean
+  pass unlocks what is left when something above the practised tier is still
+  locked. With the whole ladder open, the sentence changes rather than lying.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -162,6 +166,18 @@ Live smoke (backend + Postgres, no browser): with the API on `:8080`, a `POST`
 to `/api/v1/auth/guest` returned a token, `/api/v1/progress` returned five tiers,
 `/api/v1/drills/next?tier=0` returned a `STATIC` home-row drill, and a burst of
 new sign-ins ended in `429` with `Retry-After: 2`.
+
+Fresh-database check — the only proof that the migrations work from nothing:
+
+```bash
+createdb -h localhost -p 55434 -U 0error error_fresh
+RUN_INTEGRATION_TESTS=true DB_NAME=error_fresh DB_PORT=55434 DB_PASSWORD='' ./mvnw test
+dropdb -h localhost -p 55434 -U 0error error_fresh
+```
+
+Use a database name that does not begin with a digit: Postgres then needs it
+quoted, which this shell drops. On 2026-11-19 V1–V6 applied to an empty database
+and all 133 tests passed.
 
 Browser check (backend + Vite at `http://localhost:5173/`): the first drill
 rendered, the idle hint lit the `a` key and named the left pinky, and the theme

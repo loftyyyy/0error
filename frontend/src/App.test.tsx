@@ -123,6 +123,9 @@ const completion: SessionCompletion = {
 /** The completion the fake server answers with; one test swaps in an unlock. */
 let completionResponse: SessionCompletion = completion
 
+/** The ladder the fake server answers with; one test completes the curriculum. */
+let progressResponse = progress
+
 const FEEDBACK = 'event: token\ndata: Keep it smooth.\n\nevent: done\ndata: [DONE]\n\n'
 
 function json(body: unknown, status = 200) {
@@ -173,7 +176,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
 
   if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: [] })
   if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: [] })
-  if (url.includes('/api/v1/progress')) return json(progress)
+  if (url.includes('/api/v1/progress')) return json(progressResponse)
   if (url.includes('/api/v1/drills/next')) {
     drillIssued += 1
     return json({ ...drill, drillId: `drill-${drillIssued}` })
@@ -227,6 +230,7 @@ beforeEach(async () => {
   telemetryFailure = null
   feedbackFailure = false
   completionResponse = completion
+  progressResponse = progress
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -393,5 +397,22 @@ describe('App', () => {
 
     await waitFor(() => bodyText().includes('Top row unlocked.'), 'the unlock line')
     expect(bodyText()).not.toContain('Tier 2 unlocked.')
+  })
+
+  it('does not promise another tier once every tier is open', async () => {
+    progressResponse = {
+      ...progress,
+      tiers: progress.tiers.map((tier) => ({ ...tier, unlocked: true })),
+    }
+    completionResponse = { ...completion, tier: 4, consecutivePasses: 2 }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('Every tier is open. Keep the rhythm.'),
+      'the final-tier copy',
+    )
+    expect(bodyText()).not.toContain('One more clean pass unlocks your next tier.')
   })
 })

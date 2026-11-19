@@ -340,6 +340,11 @@ function ResultPanel({
   progress: ProgressSummary | null
   onNext: () => void
 }) {
+  // Once nothing above this tier is locked there is no next unlock to promise.
+  const nextLocked = progress?.tiers.find(
+    (tier) => tier.tier > result.tier && !tier.unlocked,
+  )
+
   return (
     <div className="rounded-2xl border border-stone-200 px-6 py-8 dark:border-stone-800">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -359,7 +364,9 @@ function ResultPanel({
         </p>
       ) : result.passed ? (
         <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
-          One more clean pass unlocks your next tier.
+          {progress && !nextLocked
+            ? 'Every tier is open. Keep the rhythm.'
+            : 'One more clean pass unlocks your next tier.'}
         </p>
       ) : (
         <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
