@@ -71,19 +71,20 @@ public class SessionCompletionService {
 													.recordSession(userId, session.tier(), rawEvents)
 													.then(fingers.recordSession(
 															userId, session.tier(), rawEvents))
-													.then(markCompleted(sessionId))
+													.then(markCompleted(sessionId, outcome.passed()))
 													.thenReturn(toResponse(
 															sessionId, session.tier(), aggregates, outcome)))));
 				});
 	}
 
-	private Mono<Void> markCompleted(UUID sessionId) {
+	private Mono<Void> markCompleted(UUID sessionId, boolean passed) {
 		return databaseClient.sql("""
 						UPDATE sessions
-						SET status = 'COMPLETED', ended_at = now()
+						SET status = 'COMPLETED', ended_at = now(), gate_passed = :passed
 						WHERE id = :sessionId AND status = 'ACTIVE'
 						""")
 				.bind("sessionId", sessionId)
+				.bind("passed", passed)
 				.fetch()
 				.rowsUpdated()
 				.flatMap(updated -> updated == 1

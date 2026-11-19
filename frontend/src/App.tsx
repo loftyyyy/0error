@@ -7,8 +7,12 @@ import { FingerNote } from './features/progress/FingerNote'
 import { FocusNote } from './features/progress/FocusNote'
 import { activeTier, fetchProgress } from './features/progress/progressApi'
 import type { ProgressSummary } from './features/progress/progressApi'
-import { completeServerSession, createServerSession } from './features/sessions/sessionApi'
-import type { SessionCompletion } from './features/sessions/sessionApi'
+import {
+  completeServerSession,
+  createServerSession,
+  fetchRecentSessions,
+} from './features/sessions/sessionApi'
+import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
 import { characterClass } from './features/typing/characterClass'
@@ -400,6 +404,7 @@ function ResultPanel({
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote tier={result.tier} />
       <FingerNote tier={result.tier} />
+      <RecentDrills />
 
       <button
         type="button"
@@ -467,6 +472,52 @@ function TierLadder({
         </p>
       )}
     </section>
+  )
+}
+
+/**
+ * The last few finished drills, collapsed by default. It is context, not a
+ * target: a failed request leaves the result panel exactly as it was.
+ */
+function RecentDrills() {
+  const [sessions, setSessions] = useState<RecentSession[] | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    fetchRecentSessions(5)
+      .then((entries) => {
+        if (active) setSessions(entries)
+      })
+      .catch(() => {
+        if (active) setSessions([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (!sessions || sessions.length === 0) return null
+
+  return (
+    <details className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
+      <summary className="cursor-pointer text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
+        Recent drills
+      </summary>
+      <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
+        {sessions.map((entry) => (
+          <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">
+            <span className="text-stone-600 dark:text-stone-300">{entry.tierName}</span>
+            <span className="text-stone-400 dark:text-stone-500">
+              {formatPercent(entry.accuracy)} &middot; {formatMs(entry.medianInterKeyMs)}{' '}
+              &middot;{' '}
+              {entry.passed === null ? 'gate unknown' : entry.passed ? 'passed' : 'not yet'}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 

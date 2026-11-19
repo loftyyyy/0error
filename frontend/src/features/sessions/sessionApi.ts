@@ -73,6 +73,37 @@ export interface SessionCompletion {
   failures: string[]
 }
 
+/** One finished drill as the history list shows it. */
+export interface RecentSession {
+  sessionId: string
+  tier: number
+  tierName: string
+  completedAt: string
+  accuracy: number | null
+  medianInterKeyMs: number | null
+  p95InterKeyMs: number | null
+  keystrokeCount: number
+  /** Null for a session completed before the gate decision was stored. */
+  passed: boolean | null
+}
+
+/**
+ * The guest's own finished drills, newest first. Read-only context for the
+ * result panel; nothing else depends on it.
+ */
+export async function fetchRecentSessions(limit = 5): Promise<RecentSession[]> {
+  const response = await authedFetch(
+    `/api/v1/sessions/recent?limit=${encodeURIComponent(String(limit))}`,
+    { headers: { Accept: 'application/json' } },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Could not load recent drills (${response.status})`)
+  }
+  const body = (await response.json()) as { sessions: RecentSession[] }
+  return body.sessions
+}
+
 /**
  * Closes the session and asks the server to score it. Telemetry must be
  * flushed first: the server recomputes every metric from the raw events.

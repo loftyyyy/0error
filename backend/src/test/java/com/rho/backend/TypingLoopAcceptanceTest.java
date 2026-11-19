@@ -18,6 +18,7 @@ import com.rho.backend.identity.GuestTokenResponse;
 import com.rho.backend.progress.ProgressSummary;
 import com.rho.backend.sessions.CreateSessionRequest;
 import com.rho.backend.sessions.SessionCompletionResponse;
+import com.rho.backend.sessions.SessionHistoryResponse;
 import com.rho.backend.sessions.SessionResponse;
 import com.rho.backend.telemetry.RawKeystroke;
 import com.rho.backend.telemetry.TelemetryBatchRequest;
@@ -135,6 +136,17 @@ class TypingLoopAcceptanceTest {
 			assertThat(first.metrics().correctCount())
 					.isEqualTo(typed.length() - stumbles.size());
 			assertThat(first.metrics().medianInterKeyMs()).isEqualTo(300);
+
+			// The finished drill is now the guest's most recent one, with the
+			// gate decision stored alongside its metrics.
+			SessionHistoryResponse history = recentSessions(token, 5);
+			assertThat(history.sessions()).singleElement().satisfies(entry -> {
+				assertThat(entry.sessionId()).isEqualTo(session.id());
+				assertThat(entry.tier()).isZero();
+				assertThat(entry.tierName()).isEqualTo("Home row");
+				assertThat(entry.passed()).isTrue();
+				assertThat(entry.accuracy()).isNotNull();
+			});
 
 			// The stumble survives scoring as one weak pair on a repeated transition.
 			WeakPairReport pairs = weakPairs(token, 0);
@@ -311,6 +323,19 @@ class TypingLoopAcceptanceTest {
 				.getResponseBody();
 		assertThat(completion).isNotNull();
 		return completion;
+	}
+
+	private SessionHistoryResponse recentSessions(String token, int limit) {
+		SessionHistoryResponse history = client.get()
+				.uri("/api/v1/sessions/recent?limit=" + limit)
+				.headers(headers -> headers.setBearerAuth(token))
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(SessionHistoryResponse.class)
+				.returnResult()
+				.getResponseBody();
+		assertThat(history).isNotNull();
+		return history;
 	}
 
 	private WeakPairReport weakPairs(String token, int tier) {

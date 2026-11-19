@@ -193,3 +193,57 @@ describe('completeServerSession', () => {
     )
   })
 })
+
+describe('fetchRecentSessions', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const storage = new MemoryStorage()
+    storage.setItem(GUEST_TOKEN_KEY, 'g_existing')
+    storage.setItem(GUEST_ID_KEY, 'guest-existing')
+    vi.stubGlobal('localStorage', storage)
+  })
+
+  const entry = {
+    sessionId: '33333333-3333-4333-8333-333333333333',
+    tier: 0,
+    tierName: 'Home row',
+    completedAt: '2026-11-18T10:00:00Z',
+    accuracy: 97.5,
+    medianInterKeyMs: 380,
+    p95InterKeyMs: 720,
+    keystrokeCount: 128,
+    passed: true,
+  }
+
+  it('asks for the requested window and returns the entries', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse({ sessions: [entry, { ...entry, sessionId: 'older', passed: null }] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { fetchRecentSessions } = await import('./sessionApi')
+    const sessions = await fetchRecentSessions(3)
+
+    expect(sessions).toHaveLength(2)
+    expect(sessions[0]).toMatchObject({ tierName: 'Home row', passed: true })
+    // A row from before the gate decision existed stays unknown.
+    expect(sessions[1].passed).toBeNull()
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/v1/sessions/recent?limit=3')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
+  })
+
+  it('reports a history that cannot be loaded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'unavailable' }, 503)),
+    )
+
+    const { fetchRecentSessions } = await import('./sessionApi')
+
+    await expect(fetchRecentSessions()).rejects.toThrow(
+      'Could not load recent drills (503)',
+    )
+  })
+})

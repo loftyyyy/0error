@@ -37,6 +37,9 @@ whatever pair or finger still makes you hesitate.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
   three failed attempts.
+- A collapsed "Recent drills" list under the result shows the guest's last five
+  finished drills with accuracy and median, plus whether each cleared its gate.
+  It is optional context: if the history request fails, the panel is unchanged.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
 - A cold load needs the API, because drills are issued rather than bundled. When
@@ -118,7 +121,10 @@ as hesitations.
 **Closed sessions are final.** Telemetry is accepted only while a session is
 `ACTIVE`. A batch that arrives after completion gets `409`, and the client drops
 it rather than retrying forever, so the stored aggregates can never drift away
-from the gate decision that was made from them.
+from the gate decision that was made from them. Completion also stores that
+decision (`gate_passed`), so the history list reports the gate as it was judged
+rather than re-judging an old attempt against thresholds that later eased. Rows
+completed before the column existed read as unknown, not as a failure.
 
 **Unlock gate.** Accuracy at least 96%, median inter-key gap at most 450 ms, p95
 at most 900 ms, at least 120 scored keystrokes, and two consecutive passes. Every
@@ -179,6 +185,7 @@ person.
 | POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
 | POST   | `/api/v1/sessions/{id}/complete`       | Score, merge aggregates, apply the gate             |
+| GET    | `/api/v1/sessions/recent?limit=`       | Own completed drills, newest first; 1–20, default 5 |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
 | GET    | `/api/v1/progress`                     | Tiers, effective thresholds, unlock timestamps      |
 | GET    | `/api/v1/progress/weak-pairs?tier=`    | Pair aggregates, weakest first                      |

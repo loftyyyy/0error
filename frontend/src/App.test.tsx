@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
-import type { SessionCompletion } from './features/sessions/sessionApi'
+import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { countPendingBatches } from './features/telemetry/keystrokeQueue'
 import { drainOutbox } from './features/telemetry/telemetryBuffer'
 
@@ -126,6 +126,37 @@ let completionResponse: SessionCompletion = completion
 /** The ladder the fake server answers with; one test completes the curriculum. */
 let progressResponse = progress
 
+/** Finished drills the history list shows. */
+const recent: RecentSession[] = [
+  {
+    sessionId: 'recent-1',
+    tier: 0,
+    tierName: 'Home row',
+    completedAt: '2026-11-18T10:00:00Z',
+    accuracy: 97.5,
+    medianInterKeyMs: 380,
+    p95InterKeyMs: 720,
+    keystrokeCount: 128,
+    passed: true,
+  },
+  {
+    sessionId: 'recent-0',
+    tier: 0,
+    tierName: 'Home row',
+    completedAt: '2026-11-17T10:00:00Z',
+    accuracy: 91.2,
+    medianInterKeyMs: 610,
+    p95InterKeyMs: 1200,
+    keystrokeCount: 84,
+    passed: false,
+  },
+]
+
+let recentResponse: RecentSession[] = recent
+
+/** When set, the history request fails with this status. */
+let recentFailure: number | null = null
+
 const FEEDBACK = 'event: token\ndata: Keep it smooth.\n\nevent: done\ndata: [DONE]\n\n'
 
 function json(body: unknown, status = 200) {
@@ -186,6 +217,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     if (telemetryFailure !== null) return json({ error: 'temporarily unavailable' }, telemetryFailure)
     return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   }
+  if (url.includes('/api/v1/sessions/recent')) {
+    if (recentFailure !== null) return json({ error: 'temporarily unavailable' }, recentFailure)
+    return json({ sessions: recentResponse })
+  }
   if (url.includes('/complete')) return json(completionResponse)
   if (url.includes('/feedback')) {
     if (feedbackFailure) return json({ error: 'temporarily unavailable' }, 503)
@@ -231,6 +266,8 @@ beforeEach(async () => {
   feedbackFailure = false
   completionResponse = completion
   progressResponse = progress
+  recentResponse = recent
+  recentFailure = null
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -414,5 +451,29 @@ describe('App', () => {
       'the final-tier copy',
     )
     expect(bodyText()).not.toContain('One more clean pass unlocks your next tier.')
+  })
+
+  it('lists the guests recent drills beside the score', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Recent drills'), 'the history list')
+    expect(bodyText()).toContain('97.5%')
+    expect(bodyText()).toContain('91.2%')
+    expect(bodyText()).toContain('not yet')
+    // The list is the guest's own history, fetched with the bearer token.
+    const historyCall = calls.find((call) => call.url.includes('/api/v1/sessions/recent'))
+    expect(historyCall?.url).toContain('limit=5')
+  })
+
+  it('still shows the score when the history request fails', async () => {
+    recentFailure = 500
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Gate passed.'), 'the scored result')
+    expect(bodyText()).toContain('100.0%')
+    expect(bodyText()).not.toContain('Recent drills')
   })
 })
