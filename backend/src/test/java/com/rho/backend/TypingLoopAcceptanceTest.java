@@ -182,12 +182,10 @@ class TypingLoopAcceptanceTest {
 					.reduce("", (left, right) -> left + right);
 			assertThat(advice).isNotBlank();
 
-			// A replay cannot count the same session twice.
-			client.post()
-					.uri("/api/v1/sessions/{id}/complete", session.id())
-					.headers(headers -> headers.setBearerAuth(token))
-					.exchange()
-					.expectStatus().isEqualTo(409);
+			// A retried completion replays the stored answer and changes nothing.
+			SessionCompletionResponse replay = complete(token, session.id());
+			assertThat(replay).isEqualTo(first);
+			assertThat(weakPairs(token, 0).pairs()).isEqualTo(pairs.pairs());
 
 			// A drill id is single-use: a second session cannot cite the same set.
 			client.post()

@@ -20,7 +20,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Completed drills now carry their gate decision (`gate_passed`), and `GET /api/v1/sessions/recent?limit=` returns the guest's own finished drills, newest first. The result panel gains a collapsed "Recent drills" list with each attempt's accuracy, median, and outcome; the request is optional, so a failure leaves the score untouched. The history index covers `(user_id, ended_at desc)` where the session is completed, and rows finished before the column existed read as "gate unknown" rather than as a failure. A Postgres integration test proves owner scoping, ordering, the limit bounds, and null legacy metrics; the acceptance test checks the finished drill appears immediately. |
+| `HEAD`    | A retried completion replays the answer the first completion produced. The scored response is written to `sessions.completion` (jsonb) in the same transaction that flips the status, so a lost response no longer leaves the guest stuck on a conflict with an attempt the server already accepted. Pair and finger aggregates are still merged once. A session completed before the stored answer existed has nothing to replay and keeps answering `409`. The integration test completes twice and asserts identical responses plus unchanged aggregates, then clears the column and asserts the legacy conflict; the acceptance test retries completion and asserts the weak-pair report did not move. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
@@ -121,6 +121,10 @@ commit `HEAD`; older rows keep their real hashes.
   completed before the column existed stays null, which the UI shows as "gate
   unknown"; it is never treated as a failure. Recent-drills is optional context:
   a failed request leaves the result panel exactly as it was.
+- **Completion is idempotent by replay, never by re-scoring.** The response is
+  stored as jsonb beside the session, so a retry returns the same numbers and
+  gate decision without touching aggregates or tier progress. Recomputing it
+  later would be dishonest: thresholds ease and counters move.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -181,7 +185,7 @@ dropdb -h localhost -p 55434 -U 0error error_fresh
 ```
 
 Use a database name that does not begin with a digit: Postgres then needs it
-quoted, which this shell drops. On 2026-11-19 V1–V7 applied to an empty database
+quoted, which this shell drops. On 2026-11-19 V1–V8 applied to an empty database
 and all 135 tests passed.
 
 Browser check (backend + Vite at `http://localhost:5173/`): the first drill

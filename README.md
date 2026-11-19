@@ -126,6 +126,13 @@ decision (`gate_passed`), so the history list reports the gate as it was judged
 rather than re-judging an old attempt against thresholds that later eased. Rows
 completed before the column existed read as unknown, not as a failure.
 
+**Completion is idempotent.** The scored response is stored with the session in
+the same transaction that marks it `COMPLETED`. A retried `POST /complete` —
+what a lost response produces — returns that stored answer instead of scoring
+again, and pair or finger aggregates are still merged only once. A session
+completed before the stored answer existed has nothing to replay and still
+answers `409`.
+
 **Unlock gate.** Accuracy at least 96%, median inter-key gap at most 450 ms, p95
 at most 900 ms, at least 120 scored keystrokes, and two consecutive passes. Every
 third failed attempt relaxes both cadence thresholds by 15%. An unlocked tier is
@@ -184,7 +191,7 @@ person.
 | GET    | `/api/v1/drills/next?tier=&exclude=`   | Next drill; `403` when the tier is locked           |
 | POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
-| POST   | `/api/v1/sessions/{id}/complete`       | Score, merge aggregates, apply the gate             |
+| POST   | `/api/v1/sessions/{id}/complete`       | Score once; a retry replays the stored answer       |
 | GET    | `/api/v1/sessions/recent?limit=`       | Own completed drills, newest first; 1–20, default 5 |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
 | GET    | `/api/v1/progress`                     | Tiers, effective thresholds, unlock timestamps      |

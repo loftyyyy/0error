@@ -2,6 +2,7 @@ package com.rho.backend.analysis;
 
 import java.util.UUID;
 
+import com.rho.backend.sessions.SessionCompletionResponse;
 import com.rho.backend.sessions.SessionCompletionService;
 
 import org.junit.jupiter.api.Test;
@@ -17,9 +18,9 @@ import reactor.test.StepVerifier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Proves the completion transaction records pair aggregates and that the
- * ACTIVE-to-COMPLETED guard keeps a replay from counting the same session
- * twice. Needs a database, so it is off by default.
+ * Proves the completion transaction records pair aggregates and that a replay
+ * returns the stored answer without counting the same session twice. Needs a
+ * database, so it is off by default.
  */
 @SpringBootTest
 @EnabledIfEnvironmentVariable(named = "RUN_INTEGRATION_TESTS", matches = "true")
@@ -32,7 +33,7 @@ class WeakPairCompletionIntegrationTest {
 	private DatabaseClient databaseClient;
 
 	@Test
-	void completionMergesPairsOnceAndReplayIsRejected() {
+	void completionMergesPairsOnceAndReplaysTheSameAnswer() {
 		UUID userId = UUID.randomUUID();
 		UUID sessionId = UUID.randomUUID();
 
@@ -43,13 +44,27 @@ class WeakPairCompletionIntegrationTest {
 			insertEvent(sessionId, 1, 1, "k", false, 1_000);
 			insertEvent(sessionId, 2, 2, "s", true, 100);
 
-			completion.complete(userId, sessionId).block();
-
+			SessionCompletionResponse first = completion.complete(userId, sessionId).block();
+			assertThat(first).isNotNull();
 			assertPair(userId, "d", "k", 1, 1, 1, 1_000);
 			assertPair(userId, "k", "s", 1, 0, 0, 100);
 			assertFinger(userId, Finger.LEFT_MIDDLE, 1, 0, 0, 100);
 			assertFinger(userId, Finger.RIGHT_MIDDLE, 1, 1, 1, 1_000);
 			assertFinger(userId, Finger.LEFT_RING, 1, 0, 0, 100);
+
+			// A retry after a lost response gets the same answer back.
+			SessionCompletionResponse replay = completion.complete(userId, sessionId).block();
+			assertThat(replay).isEqualTo(first);
+
+			assertPair(userId, "d", "k", 1, 1, 1, 1_000);
+			assertFinger(userId, Finger.RIGHT_MIDDLE, 1, 1, 1, 1_000);
+
+			// A row completed before the stored answer existed cannot replay.
+			databaseClient.sql("UPDATE sessions SET completion = NULL WHERE id = :id")
+					.bind("id", sessionId)
+					.fetch()
+					.rowsUpdated()
+					.block();
 
 			StepVerifier.create(completion.complete(userId, sessionId))
 					.expectErrorSatisfies(error -> {
@@ -58,9 +73,6 @@ class WeakPairCompletionIntegrationTest {
 								.isEqualTo(HttpStatus.CONFLICT);
 					})
 					.verify();
-
-			assertPair(userId, "d", "k", 1, 1, 1, 1_000);
-			assertFinger(userId, Finger.RIGHT_MIDDLE, 1, 1, 1, 1_000);
 		}
 		finally {
 			databaseClient.sql("DELETE FROM users WHERE id = :id")
