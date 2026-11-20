@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   135 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 81 tests in 16 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 82 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The result panel now says plainly what a missed gate wanted: "Accuracy 94.00%: needs 96% or more." instead of a raw comparison, with the same treatment for median, p95, keystrokes, and a cadence that was never measured. The list is no longer monospaced, so it reads as advice rather than diagnostics. Recent drills also gain the completion date in the guest's locale, because "last five" means little without knowing when. `TierGateTest` pins all four sentences and both unmeasured-cadence cases; an App test renders a failed attempt, and the history test checks each date. |
+| `HEAD`    | Recent drills now opens with five rows and offers the rest behind "Show 15 more", covering the twenty the endpoint already allows. One request fetches the window, so revealing older attempts costs no round trip and no new endpoint; the error path is unchanged. An App test seeds seven attempts, asserts five rows and the affordance, then clicks and asserts all seven. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
@@ -120,7 +120,9 @@ commit `HEAD`; older rows keep their real hashes.
   the session, so a later history read reports the gate as it was judged. A row
   completed before the column existed stays null, which the UI shows as "gate
   unknown"; it is never treated as a failure. Recent-drills is optional context:
-  a failed request leaves the result panel exactly as it was.
+  a failed request leaves the result panel exactly as it was. It opens with five
+  rows and reveals up to twenty on request from the same single fetch, so there
+  is no paging state to keep.
 - **Completion is idempotent by replay, never by re-scoring.** The response is
   stored as jsonb beside the session, so a retry returns the same numbers and
   gate decision without touching aggregates or tier progress. Recomputing it
@@ -207,9 +209,9 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A deeper history view.** The result panel now lists the last five completed
-   drills with their gate outcomes, but there is no per-pair or per-tier trend
-   over time. That remains a product idea, not a gap in the loop.
+3. **A deeper history view.** The result panel now lists up to twenty completed
+   drills, five at a time, with gate outcomes. There is still no per-pair or
+   per-tier trend over time. That remains a product idea, not a gap in the loop.
 
 ## Housekeeping
 

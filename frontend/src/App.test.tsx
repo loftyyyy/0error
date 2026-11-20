@@ -490,7 +490,32 @@ describe('App', () => {
     expect(bodyText()).toContain(day(recent[1].completedAt))
     // The list is the guest's own history, fetched with the bearer token.
     const historyCall = calls.find((call) => call.url.includes('/api/v1/sessions/recent'))
-    expect(historyCall?.url).toContain('limit=5')
+    expect(historyCall?.url).toContain('limit=20')
+  })
+
+  it('reveals older drills on request without leaving the result', async () => {
+    recentResponse = Array.from({ length: 7 }, (_, index) => ({
+      ...recent[0],
+      sessionId: `recent-${index}`,
+      completedAt: `2026-11-${String(18 - index).padStart(2, '0')}T10:00:00Z`,
+    }))
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Recent drills'), 'the history list')
+    const rows = () => container?.querySelectorAll('details li') ?? []
+    expect(rows()).toHaveLength(5)
+    expect(bodyText()).toContain('Show 2 more')
+
+    const more = container?.querySelector('details button')
+    expect(more).not.toBeNull()
+    await act(async () => {
+      ;(more as HTMLButtonElement).click()
+    })
+
+    expect(rows()).toHaveLength(7)
+    expect(bodyText()).not.toContain('Show 2 more')
   })
 
   it('still shows the score when the history request fails', async () => {

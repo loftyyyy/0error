@@ -39,10 +39,10 @@ whatever pair or finger still makes you hesitate.
   three failed attempts.
 - A missed gate is stated as advice, one line per criterion: "Median 512 ms:
   needs 450 ms or less." The list is not raw diagnostics in monospace.
-- A collapsed "Recent drills" list under the result shows the guest's last five
-  finished drills with the date, accuracy, median, and whether each cleared its
-  gate. It is optional context: if the history request fails, the panel is
-  unchanged.
+- A collapsed "Recent drills" list under the result shows the guest's five most
+  recent finished drills with the date, accuracy, median, and whether each
+  cleared its gate. Up to twenty are one click away. It is optional context: if
+  the history request fails, the panel is unchanged.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
 - A cold load needs the API, because drills are issued rather than bundled. When

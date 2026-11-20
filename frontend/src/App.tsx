@@ -476,16 +476,21 @@ function TierLadder({
 }
 
 /**
- * The last few finished drills, collapsed by default. It is context, not a
- * target: a failed request leaves the result panel exactly as it was.
+ * The finished drills the result panel offers: five at first, up to twenty
+ * behind a click. It is context, not a target: a failed request leaves the
+ * result panel exactly as it was.
  */
+const HISTORY_VISIBLE = 5
+const HISTORY_LIMIT = 20
+
 function RecentDrills() {
   const [sessions, setSessions] = useState<RecentSession[] | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     let active = true
 
-    fetchRecentSessions(5)
+    fetchRecentSessions(HISTORY_LIMIT)
       .then((entries) => {
         if (active) setSessions(entries)
       })
@@ -500,13 +505,16 @@ function RecentDrills() {
 
   if (!sessions || sessions.length === 0) return null
 
+  const visible = expanded ? sessions : sessions.slice(0, HISTORY_VISIBLE)
+  const hidden = sessions.length - visible.length
+
   return (
     <details className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
       <summary className="cursor-pointer text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
         Recent drills
       </summary>
       <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
-        {sessions.map((entry) => (
+        {visible.map((entry) => (
           <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">
             <span className="text-stone-600 dark:text-stone-300">
               {entry.tierName}
@@ -522,6 +530,15 @@ function RecentDrills() {
           </li>
         ))}
       </ul>
+      {hidden > 0 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+        >
+          Show {hidden} more
+        </button>
+      ) : null}
     </details>
   )
 }
