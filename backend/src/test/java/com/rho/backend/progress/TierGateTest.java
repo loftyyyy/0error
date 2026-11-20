@@ -25,11 +25,11 @@ class TierGateTest {
 		TierGateResult result = TierGate.evaluate(metrics(50, "95.99", 451, 901), 0);
 
 		assertThat(result.passed()).isFalse();
-		assertThat(result.failures()).hasSize(4);
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("accuracy"));
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("median"));
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("p95"));
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("keystrokes"));
+		assertThat(result.failures()).containsExactly(
+				"Accuracy 95.99%: needs 96% or more.",
+				"Median 451 ms: needs 450 ms or less.",
+				"p95 901 ms: needs 900 ms or less.",
+				"Keystrokes 50: needs 120 or more.");
 	}
 
 	@Test
@@ -38,8 +38,10 @@ class TierGateTest {
 				new SessionMetrics(130, 130, new BigDecimal("100.00"), null, null, 0), 0);
 
 		assertThat(result.passed()).isFalse();
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("median"));
-		assertThat(result.failures()).anyMatch(failure -> failure.startsWith("p95"));
+		assertThat(result.failures()).anyMatch(
+				failure -> failure.startsWith("Median not measured"));
+		assertThat(result.failures()).anyMatch(
+				failure -> failure.startsWith("p95 not measured"));
 	}
 
 	@Test

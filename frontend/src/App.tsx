@@ -392,7 +392,7 @@ function ResultPanel({
       </p>
 
       {result.failures.length > 0 ? (
-        <ul className="mt-4 space-y-1 font-mono text-xs text-stone-500 dark:text-stone-400">
+        <ul className="mt-4 space-y-1 text-xs text-stone-500 dark:text-stone-400">
           {result.failures.map((failure) => (
             <li key={failure}>{failure}</li>
           ))}
@@ -508,7 +508,12 @@ function RecentDrills() {
       <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
         {sessions.map((entry) => (
           <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">
-            <span className="text-stone-600 dark:text-stone-300">{entry.tierName}</span>
+            <span className="text-stone-600 dark:text-stone-300">
+              {entry.tierName}
+              <span className="ml-2 text-stone-400 dark:text-stone-500">
+                {shortDate(entry.completedAt)}
+              </span>
+            </span>
             <span className="text-stone-400 dark:text-stone-500">
               {formatPercent(entry.accuracy)} &middot; {formatMs(entry.medianInterKeyMs)}{' '}
               &middot;{' '}
@@ -580,6 +585,13 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function formatPercent(value: number | null): string {
   return value === null ? '\u2014' : `${value.toFixed(1)}%`
+}
+
+/** A short calendar date for the history list, in the guest's own locale. */
+function shortDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 function formatMs(value: number | null): string {

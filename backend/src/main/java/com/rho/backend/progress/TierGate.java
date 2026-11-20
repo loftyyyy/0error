@@ -1,5 +1,6 @@
 package com.rho.backend.progress;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,23 +31,35 @@ public final class TierGate {
 
 		List<String> failures = new ArrayList<>();
 
-		double accuracy = metrics.accuracy() == null ? -1 : metrics.accuracy().doubleValue();
-		if (accuracy < MIN_ACCURACY) {
-			failures.add("accuracy %.2f < %.0f".formatted(accuracy, MIN_ACCURACY));
+		BigDecimal accuracy = metrics.accuracy();
+		if (accuracy == null) {
+			failures.add("Accuracy not measured: needs %.0f%% or more.".formatted(MIN_ACCURACY));
+		}
+		else if (accuracy.doubleValue() < MIN_ACCURACY) {
+			failures.add("Accuracy %.2f%%: needs %.0f%% or more."
+					.formatted(accuracy.doubleValue(), MIN_ACCURACY));
 		}
 
 		Integer median = metrics.medianInterKeyMs();
-		if (median == null || median > medianThreshold) {
-			failures.add("median %s > %d".formatted(median, medianThreshold));
+		if (median == null) {
+			failures.add("Median not measured: needs %d ms or less.".formatted(medianThreshold));
+		}
+		else if (median > medianThreshold) {
+			failures.add("Median %d ms: needs %d ms or less."
+					.formatted(median, medianThreshold));
 		}
 
 		Integer p95 = metrics.p95InterKeyMs();
-		if (p95 == null || p95 > p95Threshold) {
-			failures.add("p95 %s > %d".formatted(p95, p95Threshold));
+		if (p95 == null) {
+			failures.add("p95 not measured: needs %d ms or less.".formatted(p95Threshold));
+		}
+		else if (p95 > p95Threshold) {
+			failures.add("p95 %d ms: needs %d ms or less.".formatted(p95, p95Threshold));
 		}
 
 		if (metrics.keystrokeCount() < MIN_KEYSTROKES) {
-			failures.add("keystrokes %d < %d".formatted(metrics.keystrokeCount(), MIN_KEYSTROKES));
+			failures.add("Keystrokes %d: needs %d or more."
+					.formatted(metrics.keystrokeCount(), MIN_KEYSTROKES));
 		}
 
 		return new TierGateResult(

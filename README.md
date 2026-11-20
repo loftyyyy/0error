@@ -37,9 +37,12 @@ whatever pair or finger still makes you hesitate.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
   three failed attempts.
+- A missed gate is stated as advice, one line per criterion: "Median 512 ms:
+  needs 450 ms or less." The list is not raw diagnostics in monospace.
 - A collapsed "Recent drills" list under the result shows the guest's last five
-  finished drills with accuracy and median, plus whether each cleared its gate.
-  It is optional context: if the history request fails, the panel is unchanged.
+  finished drills with the date, accuracy, median, and whether each cleared its
+  gate. It is optional context: if the history request fails, the panel is
+  unchanged.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
 - A cold load needs the API, because drills are issued rather than bundled. When

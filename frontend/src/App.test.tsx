@@ -453,7 +453,31 @@ describe('App', () => {
     expect(bodyText()).not.toContain('One more clean pass unlocks your next tier.')
   })
 
+  it('shows each missed gate in plain words', async () => {
+    completionResponse = {
+      ...completion,
+      passed: false,
+      consecutivePasses: 0,
+      unlockedTier: null,
+      failures: [
+        'Accuracy 94.00%: needs 96% or more.',
+        'Median 512 ms: needs 450 ms or less.',
+      ],
+    }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Not yet.'), 'the failed result')
+    expect(bodyText()).toContain('Every third attempt eases the cadence gate by 15%.')
+    expect(bodyText()).toContain('Accuracy 94.00%: needs 96% or more.')
+    expect(bodyText()).toContain('Median 512 ms: needs 450 ms or less.')
+  })
+
   it('lists the guests recent drills beside the score', async () => {
+    const day = (value: string) =>
+      new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+
     await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
     for (const key of DRILL_TEXT) await press(key)
 
@@ -461,6 +485,9 @@ describe('App', () => {
     expect(bodyText()).toContain('97.5%')
     expect(bodyText()).toContain('91.2%')
     expect(bodyText()).toContain('not yet')
+    // A date gives each attempt a place in the past.
+    expect(bodyText()).toContain(day(recent[0].completedAt))
+    expect(bodyText()).toContain(day(recent[1].completedAt))
     // The list is the guest's own history, fetched with the bearer token.
     const historyCall = calls.find((call) => call.url.includes('/api/v1/sessions/recent'))
     expect(historyCall?.url).toContain('limit=5')
