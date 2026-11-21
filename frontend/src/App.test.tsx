@@ -190,6 +190,9 @@ let calls: RecordedCall[] = []
 /** When set, telemetry batches fail with this status, as a flaky network would. */
 let telemetryFailure: number | null = null
 
+/** When set, the completion request fails with this status. */
+let completionFailure: number | null = null
+
 /** When true, the coaching stream is unavailable. */
 let feedbackFailure = false
 
@@ -221,7 +224,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     if (recentFailure !== null) return json({ error: 'temporarily unavailable' }, recentFailure)
     return json({ sessions: recentResponse })
   }
-  if (url.includes('/complete')) return json(completionResponse)
+  if (url.includes('/complete')) {
+    if (completionFailure !== null) return json({ error: 'closed' }, completionFailure)
+    return json(completionResponse)
+  }
   if (url.includes('/feedback')) {
     if (feedbackFailure) return json({ error: 'temporarily unavailable' }, 503)
     return eventStream(FEEDBACK)
@@ -263,6 +269,7 @@ beforeEach(async () => {
   calls = []
   drillIssued = 0
   telemetryFailure = null
+  completionFailure = null
   feedbackFailure = false
   completionResponse = completion
   progressResponse = progress
@@ -400,6 +407,37 @@ describe('App', () => {
         (call) => call.url.includes('/telemetry') && call.method === 'POST',
       ).length,
     ).toBeGreaterThan(1)
+  })
+
+  it('starts a fresh drill when the attempt can no longer be scored', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+
+    completionFailure = 409
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('Start a fresh drill'),
+      'the closed-attempt action',
+    )
+    expect(bodyText()).toContain('This attempt can no longer be scored.')
+    expect(bodyText()).toContain('The server closed this drill before it was scored.')
+    // A terminal close is not a network problem; queued keystrokes cannot help.
+    expect(bodyText()).not.toContain('Nothing is lost')
+
+    const issuedBefore = drillIssued
+    const fresh = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+      button.textContent?.includes('Start a fresh drill'),
+    )
+    expect(fresh).toBeDefined()
+
+    completionFailure = null
+    await act(async () => {
+      fresh?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(() => drillIssued > issuedBefore, 'a fresh drill request')
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the fresh drill')
+    expect(bodyText()).not.toContain('This attempt can no longer be scored.')
   })
 
   it('keeps the scored result when the coach stream fails', async () => {

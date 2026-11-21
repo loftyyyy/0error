@@ -180,17 +180,30 @@ describe('completeServerSession', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
   })
 
-  it('reports an already scored session', async () => {
+  it('marks a closed session as gone instead of retryable', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => jsonResponse({ error: 'conflict' }, 409)),
     )
 
-    const { completeServerSession } = await import('./sessionApi')
+    const { completeServerSession, SessionGoneError } = await import('./sessionApi')
+    const error = await completeServerSession(sessionBody.id).catch((reason: unknown) => reason)
 
-    await expect(completeServerSession(sessionBody.id)).rejects.toThrow(
-      'This drill was already scored',
+    expect(error).toBeInstanceOf(SessionGoneError)
+    expect((error as Error).message).toBe('The server closed this drill before it was scored.')
+  })
+
+  it('marks a session the guest no longer holds as gone', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'missing' }, 404)),
     )
+
+    const { completeServerSession, SessionGoneError } = await import('./sessionApi')
+    const error = await completeServerSession(sessionBody.id).catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(SessionGoneError)
+    expect((error as Error).message).toBe('The server no longer has this drill.')
   })
 })
 

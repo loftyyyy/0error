@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   135 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 82 tests in 16 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 84 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Recent drills now opens with five rows and offers the rest behind "Show 15 more", covering the twenty the endpoint already allows. One request fetches the window, so revealing older attempts costs no round trip and no new endpoint; the error path is unchanged. An App test seeds seven attempts, asserts five rows and the affordance, then clicks and asserts all seven. |
+| `HEAD`    | A drill the server has already closed no longer traps the guest on a retry. Completion answers `404` or `409` through a distinct `SessionGoneError`, and the error panel switches from "Nothing is lost" to "This attempt can no longer be scored", then offers "Start a fresh drill" instead of repeating a request that can never succeed. This covers a tab swept as abandoned overnight, a legacy row with no stored answer, and a guest identity the browser no longer holds. An App test forces a `409`, asserts the terminal copy, clicks the action, and proves a new drill is issued; two API tests pin the new error for `404` and `409`. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
@@ -131,6 +131,10 @@ commit `HEAD`; older rows keep their real hashes.
   gate wanted ("Median 512 ms: needs 450 ms or less."), never a bare comparison.
   The result list drops mono so it reads like a sentence, and the history dates
   each attempt instead of leaving five identical-looking rows.
+- **A closed attempt ends.** `404` and `409` from completion are terminal, not a
+  flaky network: the client stops offering "Try again" and starts a fresh drill,
+  leaving the tier untouched. Only a network or server failure keeps the queued
+  keystrokes and the retry path.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is

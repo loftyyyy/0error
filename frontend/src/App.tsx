@@ -11,6 +11,7 @@ import {
   completeServerSession,
   createServerSession,
   fetchRecentSessions,
+  SessionGoneError,
 } from './features/sessions/sessionApi'
 import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
@@ -52,6 +53,8 @@ function App() {
   const [result, setResult] = useState<SessionCompletion | null>(null)
   const [progress, setProgress] = useState<ProgressSummary | null>(null)
   const [error, setError] = useState('')
+  /** The attempt is closed on the server; retrying the score cannot help. */
+  const [terminal, setTerminal] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -97,12 +100,16 @@ function App() {
     setDrill(null)
     setResult(null)
     setError('')
+    setTerminal(false)
     setPhase('loading')
     setAttempt((value) => value + 1)
   }
 
   const retry = () => {
     setError('')
+    setTerminal(false)
+    setDrill(null)
+    setResult(null)
     setPhase('loading')
     setAttempt((value) => value + 1)
   }
@@ -126,7 +133,13 @@ function App() {
         .then(setProgress)
         .catch(() => undefined)
     } catch (reason: unknown) {
-      setError(reason instanceof Error ? reason.message : 'Could not score this drill.')
+      if (reason instanceof SessionGoneError) {
+        setTerminal(true)
+        setError(reason.message)
+      } else {
+        setTerminal(false)
+        setError(reason instanceof Error ? reason.message : 'Could not score this drill.')
+      }
       setPhase('error')
     }
   }
@@ -158,12 +171,13 @@ function App() {
         {phase === 'error' ? (
           <ConnectionError
             message={error}
-            scoring={Boolean(drill)}
+            scoring={Boolean(drill) && !terminal}
+            terminal={terminal}
             onRetry={() => {
-              if (drill) {
-                void score()
-              } else {
+              if (terminal || !drill) {
                 retry()
+              } else {
+                void score()
               }
             }}
           />
@@ -207,18 +221,22 @@ function LoadingDrill() {
 function ConnectionError({
   message,
   scoring,
+  terminal,
   onRetry,
 }: {
   message: string
   scoring: boolean
+  terminal: boolean
   onRetry: () => void
 }) {
   return (
     <div className="rounded-2xl border border-stone-200 px-6 py-8 dark:border-stone-800">
       <p className="text-sm text-stone-500 dark:text-stone-400">
-        {scoring
-          ? 'The drill is not scored yet. Nothing is lost: your keystrokes stay queued.'
-          : 'The server is not reachable, so this drill cannot be recorded.'}
+        {terminal
+          ? 'This attempt can no longer be scored. Your tier has not moved.'
+          : scoring
+            ? 'The drill is not scored yet. Nothing is lost: your keystrokes stay queued.'
+            : 'The server is not reachable, so this drill cannot be recorded.'}
       </p>
       <p className="mt-2 text-xs text-stone-400 dark:text-stone-500">{message}</p>
       <button
@@ -226,8 +244,12 @@ function ConnectionError({
         onClick={onRetry}
         className="mt-6 flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1.5 text-sm text-stone-600 transition hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:text-stone-300 dark:hover:border-stone-700 dark:hover:text-stone-50"
       >
-        <RotateCcw size={13} strokeWidth={1.75} />
-        Try again
+        {terminal ? (
+          <ArrowRight size={13} strokeWidth={1.75} />
+        ) : (
+          <RotateCcw size={13} strokeWidth={1.75} />
+        )}
+        {terminal ? 'Start a fresh drill' : 'Try again'}
       </button>
     </div>
   )

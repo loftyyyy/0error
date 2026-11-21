@@ -105,6 +105,14 @@ export async function fetchRecentSessions(limit = 5): Promise<RecentSession[]> {
 }
 
 /**
+ * The server can no longer score this attempt: it was closed by the
+ * abandonment sweep, already completed without a stored answer, or belongs to
+ * a guest identity this browser no longer holds. Retrying cannot help, so the
+ * app starts a fresh drill instead of looping on the same request.
+ */
+export class SessionGoneError extends Error {}
+
+/**
  * Closes the session and asks the server to score it. Telemetry must be
  * flushed first: the server recomputes every metric from the raw events.
  */
@@ -114,8 +122,11 @@ export async function completeServerSession(sessionId: string): Promise<SessionC
     { method: 'POST', headers: { Accept: 'application/json' } },
   )
 
+  if (response.status === 404) {
+    throw new SessionGoneError('The server no longer has this drill.')
+  }
   if (response.status === 409) {
-    throw new Error('This drill was already scored')
+    throw new SessionGoneError('The server closed this drill before it was scored.')
   }
   if (!response.ok) {
     throw new Error(`Could not score this drill (${response.status})`)

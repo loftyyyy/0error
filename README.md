@@ -45,6 +45,10 @@ whatever pair or finger still makes you hesitate.
   the history request fails, the panel is unchanged.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
+- A drill the server has already closed — swept as abandoned while a tab slept,
+  completed before answers were stored, or owned by a guest identity this
+  browser no longer holds — is not retried forever. The panel says the attempt
+  cannot be scored and offers a fresh drill, with the tier untouched.
 - A cold load needs the API, because drills are issued rather than bundled. When
   the server is unreachable the panel says so in plain words instead of echoing
   a browser's "Failed to fetch".
