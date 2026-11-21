@@ -43,6 +43,10 @@ whatever pair or finger still makes you hesitate.
   recent finished drills with the date, accuracy, median, and whether each
   cleared its gate. Up to twenty are one click away. It is optional context: if
   the history request fails, the panel is unchanged.
+- Above that list, a single line reads the practised tier's direction across the
+  most recent five attempts at it: "Home row over your last 4 drills: accuracy
+  91.2% → 97.5% · median 610 ms → 380 ms." It compares the server's own numbers
+  and draws no chart.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
 - A drill the server has already closed — swept as abandoned while a tab slept,

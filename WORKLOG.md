@@ -10,7 +10,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   135 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 84 tests in 16 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 85 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,7 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | A drill the server has already closed no longer traps the guest on a retry. Completion answers `404` or `409` through a distinct `SessionGoneError`, and the error panel switches from "Nothing is lost" to "This attempt can no longer be scored", then offers "Start a fresh drill" instead of repeating a request that can never succeed. This covers a tab swept as abandoned overnight, a legacy row with no stored answer, and a guest identity the browser no longer holds. An App test forces a `409`, asserts the terminal copy, clicks the action, and proves a new drill is issued; two API tests pin the new error for `404` and `409`. |
+| `HEAD`    | The result panel now answers whether the tier is moving. Above the recent list, one line compares the oldest and newest of the last five attempts at the practised tier: "Home row over your last 4 drills: accuracy 91.2% → 97.5% · median 610 ms → 380 ms." It reuses the single history fetch, filters to that tier so another tier never blends in, and draws no chart. Fewer than two attempts at the tier shows nothing. The history test asserts the line and its oldest-to-newest direction; a second test mixes tiers and proves only the practised one contributes. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
@@ -135,6 +135,11 @@ commit `HEAD`; older rows keep their real hashes.
   flaky network: the client stops offering "Try again" and starts a fresh drill,
   leaving the tier untouched. Only a network or server failure keeps the queued
   keystrokes and the retry path.
+- **A trend is a sentence, not a chart.** The result panel names the direction of
+  the practised tier from the same history window, filtering to that tier and
+  comparing the oldest attempt with the newest above it. It uses only the
+  server's stored numbers, shows nothing below two attempts, and keeps raw
+  charts out of the loop as before.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -213,9 +218,11 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A deeper history view.** The result panel now lists up to twenty completed
-   drills, five at a time, with gate outcomes. There is still no per-pair or
-   per-tier trend over time. That remains a product idea, not a gap in the loop.
+3. **A per-pair trend.** The result panel now reads a tier's direction from its
+   recent attempts. The weak-pair report is still a single snapshot of the latest
+   window, so it cannot say whether one transition is improving. That needs pair
+   aggregates kept per session, which is a schema addition rather than a display
+   change.
 
 ## Housekeeping
 

@@ -426,7 +426,7 @@ function ResultPanel({
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote tier={result.tier} />
       <FingerNote tier={result.tier} />
-      <RecentDrills />
+      <RecentDrills tier={result.tier} />
 
       <button
         type="button"
@@ -498,6 +498,38 @@ function TierLadder({
 }
 
 /**
+ * A one-line read on the tier just practised, from the same history fetch as
+ * the list below. It compares the oldest and newest attempt in the window
+ * rather than drawing a chart: the point is direction, not noise. Every value
+ * is the server's; this only puts two of them side by side.
+ */
+function tierTrend(sessions: RecentSession[], tier: number): string | null {
+  const mine = sessions
+    .filter((entry) => entry.tier === tier)
+    .slice(0, 5)
+    .reverse()
+  if (mine.length < 2) return null
+
+  const first = mine[0]
+  const last = mine[mine.length - 1]
+  const parts: string[] = []
+
+  if (first.accuracy !== null && last.accuracy !== null) {
+    parts.push(
+      `accuracy ${first.accuracy.toFixed(1)}% \u2192 ${last.accuracy.toFixed(1)}%`,
+    )
+  }
+  if (first.medianInterKeyMs !== null && last.medianInterKeyMs !== null) {
+    parts.push(
+      `median ${first.medianInterKeyMs} ms \u2192 ${last.medianInterKeyMs} ms`,
+    )
+  }
+  if (parts.length === 0) return null
+
+  return `${last.tierName} over your last ${mine.length} drills: ${parts.join(' \u00b7 ')}`
+}
+
+/**
  * The finished drills the result panel offers: five at first, up to twenty
  * behind a click. It is context, not a target: a failed request leaves the
  * result panel exactly as it was.
@@ -505,7 +537,7 @@ function TierLadder({
 const HISTORY_VISIBLE = 5
 const HISTORY_LIMIT = 20
 
-function RecentDrills() {
+function RecentDrills({ tier }: { tier: number }) {
   const [sessions, setSessions] = useState<RecentSession[] | null>(null)
   const [expanded, setExpanded] = useState(false)
 
@@ -529,39 +561,45 @@ function RecentDrills() {
 
   const visible = expanded ? sessions : sessions.slice(0, HISTORY_VISIBLE)
   const hidden = sessions.length - visible.length
+  const trend = tierTrend(sessions, tier)
 
   return (
-    <details className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
-      <summary className="cursor-pointer text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
-        Recent drills
-      </summary>
-      <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
-        {visible.map((entry) => (
-          <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">
-            <span className="text-stone-600 dark:text-stone-300">
-              {entry.tierName}
-              <span className="ml-2 text-stone-400 dark:text-stone-500">
-                {shortDate(entry.completedAt)}
-              </span>
-            </span>
-            <span className="text-stone-400 dark:text-stone-500">
-              {formatPercent(entry.accuracy)} &middot; {formatMs(entry.medianInterKeyMs)}{' '}
-              &middot;{' '}
-              {entry.passed === null ? 'gate unknown' : entry.passed ? 'passed' : 'not yet'}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {hidden > 0 ? (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
-        >
-          Show {hidden} more
-        </button>
+    <div className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
+      {trend ? (
+        <p className="text-xs text-stone-400 dark:text-stone-500">{trend}</p>
       ) : null}
-    </details>
+      <details className={trend ? 'mt-3' : undefined}>
+        <summary className="cursor-pointer text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
+          Recent drills
+        </summary>
+        <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
+          {visible.map((entry) => (
+            <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">
+              <span className="text-stone-600 dark:text-stone-300">
+                {entry.tierName}
+                <span className="ml-2 text-stone-400 dark:text-stone-500">
+                  {shortDate(entry.completedAt)}
+                </span>
+              </span>
+              <span className="text-stone-400 dark:text-stone-500">
+                {formatPercent(entry.accuracy)} &middot; {formatMs(entry.medianInterKeyMs)}{' '}
+                &middot;{' '}
+                {entry.passed === null ? 'gate unknown' : entry.passed ? 'passed' : 'not yet'}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {hidden > 0 ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+          >
+            Show {hidden} more
+          </button>
+        ) : null}
+      </details>
+    </div>
   )
 }
 

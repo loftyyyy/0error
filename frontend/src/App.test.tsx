@@ -526,9 +526,49 @@ describe('App', () => {
     // A date gives each attempt a place in the past.
     expect(bodyText()).toContain(day(recent[0].completedAt))
     expect(bodyText()).toContain(day(recent[1].completedAt))
+    // The tier trend reads the window oldest to newest.
+    expect(bodyText()).toContain('Home row over your last 2 drills:')
+    expect(bodyText()).toContain('accuracy 91.2% \u2192 97.5%')
+    expect(bodyText()).toContain('median 610 ms \u2192 380 ms')
     // The list is the guest's own history, fetched with the bearer token.
     const historyCall = calls.find((call) => call.url.includes('/api/v1/sessions/recent'))
     expect(historyCall?.url).toContain('limit=20')
+  })
+
+  it('reads the tier trend from the practised tier only', async () => {
+    recentResponse = [
+      {
+        ...recent[0],
+        sessionId: 'trend-new',
+        accuracy: 95,
+        medianInterKeyMs: 420,
+      },
+      {
+        ...recent[0],
+        sessionId: 'trend-other-tier',
+        tier: 2,
+        tierName: 'Top row',
+        accuracy: 40,
+        medianInterKeyMs: 1900,
+      },
+      {
+        ...recent[0],
+        sessionId: 'trend-old',
+        accuracy: 90,
+        medianInterKeyMs: 600,
+      },
+    ]
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Recent drills'), 'the history list')
+    expect(bodyText()).toContain('Home row over your last 2 drills:')
+    expect(bodyText()).toContain('accuracy 90.0% \u2192 95.0%')
+    expect(bodyText()).toContain('median 600 ms \u2192 420 ms')
+    // Another tier's attempts never blend into the practised tier's trend.
+    expect(bodyText()).not.toContain('40.0% \u2192')
+    expect(bodyText()).not.toContain('1900 ms \u2192')
   })
 
   it('reveals older drills on request without leaving the result', async () => {
