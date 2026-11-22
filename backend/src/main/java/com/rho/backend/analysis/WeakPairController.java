@@ -35,4 +35,21 @@ public class WeakPairController {
 		catalogue.require(tier);
 		return weakPairs.report(principal.userId(), tier);
 	}
+
+	/**
+	 * How one pair moved across the guest's recent completed drills. The result
+	 * panel reads the weakest focus pair from the report and follows it here.
+	 */
+	@GetMapping("/weak-pairs/trend")
+	public Mono<WeakPairTrend> trend(
+			@RequestParam(defaultValue = "0") int tier,
+			@RequestParam String pair,
+			@RequestParam(defaultValue = "" + WeakPairService.DEFAULT_TREND_LIMIT) int limit,
+			@AuthenticationPrincipal GuestPrincipal principal) {
+		if (principal == null) {
+			return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Guest token required"));
+		}
+		catalogue.require(tier);
+		return weakPairs.trend(principal.userId(), tier, pair, limit);
+	}
 }

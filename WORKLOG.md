@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  135 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 85 tests in 16 files, oxlint clean,
+  139 tests pass, including the Postgres-backed acceptance test.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 90 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The result panel now answers whether the tier is moving. Above the recent list, one line compares the oldest and newest of the last five attempts at the practised tier: "Home row over your last 4 drills: accuracy 91.2% → 97.5% · median 610 ms → 380 ms." It reuses the single history fetch, filters to that tier so another tier never blends in, and draws no chart. Fewer than two attempts at the tier shows nothing. The history test asserts the line and its oldest-to-newest direction; a second test mixes tiers and proves only the practised one contributes. |
+| `HEAD`    | The result panel now follows the weakest focus pair across completed drills. A completion also copies its pair counts into `session_weak_pairs` (V9), one row per pair per session, so `GET /progress/weak-pairs/trend?tier=&pair=&limit=` can return the last sessions oldest first. The focus note adds "dk: mean 610 ms → 480 ms over your last 3 drills", fetched only for the weakest pair and dropped silently if it fails. The copy is aggregates only, never typed text, and survives the keystroke purge. Replaying a completion adds no second point. Tests: a service test pins oldest-first order and pair validation, an integration test completes two sessions and proves the replay does not add a third point, an App test asserts the sentence and the single-pair request, and API tests cover the window and malformed bodies. |
+| `1f0836e` | The result panel reads the practised tier's direction from the same history window: "Home row over your last 4 drills: accuracy 91.2% → 97.5% · median 610 ms → 380 ms." It filters by tier so another tier never blends in, shows nothing below two attempts, and draws no chart. |
+| `e299df0` | A completion answered `404` or `409` is terminal: the panel says the attempt cannot be scored, leaves the tier untouched, and offers "Start a fresh drill" instead of retrying forever. A network or server failure still keeps the queued keystrokes and the retry path. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
 | `af974fb` | Guest sign-in is paced per address: 30 new guests in a burst, then one every two seconds, answered `429` with `Retry-After`. Rotating an existing token is never limited. The bucket is in-process and idle ones are pruned, so no dependency was added; the browser turns the status into "Too many new visitors from this network. Wait a moment and try again." Tests cover the burst, the refill, a refused attempt not borrowing from the future, per-address budgets, the controller's `429`, and the wording. |
 | `cbaf2cc` | The unlock line names the tier instead of its number: "Top row unlocked. Your next drill moves on." The name comes from the ladder already in memory, with "Tier N" kept as the fallback when progress has not landed. An App test scores a two-pass completion and asserts the sentence. |
@@ -140,6 +142,12 @@ commit `HEAD`; older rows keep their real hashes.
   comparing the oldest attempt with the newest above it. It uses only the
   server's stored numbers, shows nothing below two attempts, and keeps raw
   charts out of the loop as before.
+- **A pair trend is per completed drill.** `session_weak_pairs` keeps one row per
+  pair per session at completion, next to the rolling merge. A session is one
+  observation even if the pair appeared ten times; the mean inside it is what the
+  typist felt. The copy happens in the completion transaction and conflicts do
+  nothing, so replay cannot add a point. Old sessions have no split and the trend
+  simply waits for two new attempts rather than inventing history.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -200,8 +208,8 @@ dropdb -h localhost -p 55434 -U 0error error_fresh
 ```
 
 Use a database name that does not begin with a digit: Postgres then needs it
-quoted, which this shell drops. On 2026-11-20 V1–V8 applied to an empty database
-and all 135 tests passed.
+quoted, which this shell drops. On 2026-11-22 V1–V9 applied to an empty database
+and all 139 tests passed.
 
 Browser check (backend + Vite at `http://localhost:5173/`): the first drill
 rendered, the idle hint lit the `a` key and named the left pinky, and the theme
@@ -218,11 +226,14 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A per-pair trend.** The result panel now reads a tier's direction from its
-   recent attempts. The weak-pair report is still a single snapshot of the latest
-   window, so it cannot say whether one transition is improving. That needs pair
-   aggregates kept per session, which is a schema addition rather than a display
-   change.
+3. **A per-finger trend.** Pair movement is visible now, but the finger note still
+   shows only the rolling total. Mirroring `session_weak_pairs` for fingers would
+   say whether a reach is improving. Lower value than the pair trend, because the
+   drill picker targets pairs first and fingers second.
+4. **A practice-this-pair action.** The focus line names the weakest pair and the
+   next drill already leans on it, but there is no explicit control to drill it
+   on demand. Worth adding only if the automatic targeting proves too subtle in
+   real use.
 
 ## Housekeeping
 

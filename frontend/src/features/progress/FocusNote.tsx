@@ -1,26 +1,56 @@
 import { useEffect, useState } from 'react'
 
-import { fetchWeakPairs, formatPairLabel } from './weakPairApi'
-import type { WeakPair } from './weakPairApi'
+import { fetchWeakPairTrend, fetchWeakPairs, formatPairLabel } from './weakPairApi'
+import type { WeakPair, WeakPairTrend } from './weakPairApi'
+
+/** Compares the first and latest session for a pair, oldest to newest. */
+function trendLine(trend: WeakPairTrend): string | null {
+  if (trend.attempts.length < 2) return null
+
+  const first = trend.attempts[0]
+  const last = trend.attempts[trend.attempts.length - 1]
+  return `${formatPairLabel(trend.pair)}: mean ${first.meanMs} ms \u2192 ${last.meanMs} ms over your last ${trend.attempts.length} drills.`
+}
 
 /**
- * A quiet line under the coach: which transitions the next drill will target.
- * It stays out of the way while loading and disappears if analysis is down.
+ * A quiet line under the coach: which transitions the next drill will target,
+ * followed by how the weakest one has moved across recent sessions. It stays
+ * out of the way while loading and disappears if analysis is down.
  */
 export function FocusNote({ tier }: { tier: number }) {
   const [pairs, setPairs] = useState<WeakPair[]>([])
+  const [trend, setTrend] = useState<WeakPairTrend | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     let active = true
 
-    void fetchWeakPairs(tier, controller.signal)
-      .then((report) => {
-        if (active) setPairs(report.pairs)
-      })
-      .catch(() => {
+    const load = async () => {
+      try {
+        const report = await fetchWeakPairs(tier, controller.signal)
+        if (!active) return
+        setPairs(report.pairs)
+
+        const weakest = report.pairs[0]
+        if (!weakest) return
+
+        try {
+          const fetched = await fetchWeakPairTrend(
+            tier,
+            weakest.pair,
+            5,
+            controller.signal,
+          )
+          if (active) setTrend(fetched)
+        } catch {
+          // The trend is extra context; the focus line still stands without it.
+        }
+      } catch {
         // Analysis is an accelerator; a failure simply leaves no note.
-      })
+      }
+    }
+
+    void load()
 
     return () => {
       active = false
@@ -37,12 +67,20 @@ export function FocusNote({ tier }: { tier: number }) {
     labels.length === 1
       ? labels[0]
       : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+  const direction = trend ? trendLine(trend) : null
 
   return (
-    <p className="mt-6 text-xs leading-relaxed text-stone-400 dark:text-stone-500">
-      <span className="tracking-[0.15em] uppercase">Focus</span>
-      <span className="mx-2 text-stone-300 dark:text-stone-700">/</span>
-      Your next drills lean on <span className="font-mono">{phrase}</span>.
-    </p>
+    <>
+      <p className="mt-6 text-xs leading-relaxed text-stone-400 dark:text-stone-500">
+        <span className="tracking-[0.15em] uppercase">Focus</span>
+        <span className="mx-2 text-stone-300 dark:text-stone-700">/</span>
+        Your next drills lean on <span className="font-mono">{phrase}</span>.
+      </p>
+      {direction ? (
+        <p className="mt-1.5 text-xs text-stone-400 dark:text-stone-500">
+          {direction}
+        </p>
+      ) : null}
+    </>
   )
 }

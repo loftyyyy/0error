@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import type { WeakPair, WeakPairTrend } from './features/progress/weakPairApi'
 import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { countPendingBatches } from './features/telemetry/keystrokeQueue'
 import { drainOutbox } from './features/telemetry/telemetryBuffer'
@@ -157,6 +158,12 @@ let recentResponse: RecentSession[] = recent
 /** When set, the history request fails with this status. */
 let recentFailure: number | null = null
 
+/** The weakest pair the result panel follows; empty means no focus note. */
+let focusPairs: WeakPair[] = []
+
+/** The trend the panel reads for that pair; null means the request fails. */
+let focusTrend: WeakPairTrend | null = null
+
 const FEEDBACK = 'event: token\ndata: Keep it smooth.\n\nevent: done\ndata: [DONE]\n\n'
 
 function json(body: unknown, status = 200) {
@@ -208,7 +215,11 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   const url = String(input)
   record(input, init)
 
-  if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: [] })
+  if (url.includes('/api/v1/progress/weak-pairs/trend')) {
+    if (focusTrend === null) return json({ error: 'unavailable' }, 503)
+    return json(focusTrend)
+  }
+  if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: focusPairs })
   if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: [] })
   if (url.includes('/api/v1/progress')) return json(progressResponse)
   if (url.includes('/api/v1/drills/next')) {
@@ -275,6 +286,8 @@ beforeEach(async () => {
   progressResponse = progress
   recentResponse = recent
   recentFailure = null
+  focusPairs = []
+  focusTrend = null
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -594,6 +607,81 @@ describe('App', () => {
 
     expect(rows()).toHaveLength(7)
     expect(bodyText()).not.toContain('Show 2 more')
+  })
+
+  it('follows the weakest focus pair across recent drills', async () => {
+    focusPairs = [
+      {
+        pair: 'dk',
+        attempts: 6,
+        errors: 2,
+        pauses: 3,
+        meanMs: 940,
+        score: 0.48,
+      },
+      {
+        pair: 'sl',
+        attempts: 4,
+        errors: 0,
+        pauses: 1,
+        meanMs: 520,
+        score: 0.12,
+      },
+    ]
+    focusTrend = {
+      tier: 0,
+      pair: 'dk',
+      attempts: [
+        {
+          recordedAt: '2026-11-16T10:00:00Z',
+          attempts: 2,
+          errors: 1,
+          pauses: 1,
+          meanMs: 610,
+        },
+        {
+          recordedAt: '2026-11-20T10:00:00Z',
+          attempts: 2,
+          errors: 0,
+          pauses: 0,
+          meanMs: 480,
+        },
+      ],
+    }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('mean 610 ms \u2192 480 ms'),
+      'the weakest pair trend',
+    )
+    expect(bodyText()).toContain('dk and sl')
+    expect(bodyText()).toContain('dk: mean 610 ms \u2192 480 ms over your last 2 drills.')
+    // Only the weakest pair is followed, and with a bounded window.
+    const trendCall = calls.find((call) => call.url.includes('/weak-pairs/trend'))
+    expect(trendCall?.url).toContain('pair=dk')
+    expect(trendCall?.url).toContain('limit=5')
+  })
+
+  it('keeps the focus note when the pair trend cannot be read', async () => {
+    focusPairs = [
+      {
+        pair: 'dk',
+        attempts: 6,
+        errors: 2,
+        pauses: 3,
+        meanMs: 940,
+        score: 0.48,
+      },
+    ]
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Your next drills lean on'), 'the focus note')
+    expect(bodyText()).toContain('dk')
+    expect(bodyText()).not.toContain('mean')
   })
 
   it('still shows the score when the history request fails', async () => {

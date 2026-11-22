@@ -30,6 +30,9 @@ class WeakPairCompletionIntegrationTest {
 	private SessionCompletionService completion;
 
 	@Autowired
+	private WeakPairService weakPairs;
+
+	@Autowired
 	private DatabaseClient databaseClient;
 
 	@Test
@@ -83,9 +86,60 @@ class WeakPairCompletionIntegrationTest {
 		}
 	}
 
+	@Test
+	void theTrendKeepsOneAttemptPerCompletedSessionOldestFirst() {
+		UUID userId = UUID.randomUUID();
+		UUID first = UUID.randomUUID();
+		UUID second = UUID.randomUUID();
+
+		try {
+			insertUser(userId);
+
+			insertSession(userId, first);
+			insertEvent(first, 0, 0, "d", true, 100);
+			insertEvent(first, 1, 1, "k", true, 900);
+			completion.complete(userId, first).block();
+
+			// Ordering must not depend on two transactions landing in the same
+			// microsecond, so push the first attempt clearly into the past.
+			databaseClient.sql("""
+							UPDATE session_weak_pairs
+							SET recorded_at = now() - interval '1 day'
+							WHERE session_id = :id
+							""")
+					.bind("id", first)
+					.fetch()
+					.rowsUpdated()
+					.block();
+
+			insertSession(userId, second);
+			insertEvent(second, 0, 0, "d", true, 100);
+			insertEvent(second, 1, 1, "k", true, 500);
+			completion.complete(userId, second).block();
+
+			WeakPairTrend trend = weakPairs.trend(userId, 0, "dk", 5).block();
+
+			assertThat(trend).isNotNull();
+			assertThat(trend.attempts()).extracting(WeakPairTrend.Attempt::meanMs)
+					.containsExactly(900, 500);
+			assertThat(trend.attempts()).extracting(WeakPairTrend.Attempt::attempts)
+					.containsExactly(1, 1);
+
+			// Replaying a completion must not add a third point to the trend.
+			completion.complete(userId, second).block();
+			assertThat(weakPairs.trend(userId, 0, "dk", 5).block().attempts()).hasSize(2);
+		}
+		finally {
+			databaseClient.sql("DELETE FROM users WHERE id = :id")
+					.bind("id", userId)
+					.fetch()
+					.rowsUpdated()
+					.block();
+		}
+	}
+
 	private void assertPair(
-			UUID userId,
-			String first,
+			UUID userId,			String first,
 			String second,
 			int attempts,
 			int errors,

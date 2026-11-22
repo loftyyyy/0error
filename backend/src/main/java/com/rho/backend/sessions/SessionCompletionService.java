@@ -81,7 +81,7 @@ public class SessionCompletionService {
 											sessionId, session.tier(), aggregates, outcome);
 									String stored = objectMapper.writeValueAsString(response);
 									return weakPairs.recordSession(
-											userId, session.tier(), rawEvents)
+											sessionId, userId, session.tier(), rawEvents)
 											.then(fingers.recordSession(
 													userId, session.tier(), rawEvents))
 											.then(markCompleted(

@@ -424,7 +424,7 @@ function ResultPanel({
       {progress ? <TierLadder progress={progress} currentTier={result.tier} /> : null}
 
       <CoachNote sessionId={drill.sessionId} />
-      <FocusNote tier={result.tier} />
+      <FocusNote key={result.tier} tier={result.tier} />
       <FingerNote tier={result.tier} />
       <RecentDrills tier={result.tier} />
 
