@@ -115,8 +115,9 @@ Copy `.env.example` values into the backend process environment as needed.
 | `DB_PASSWORD`                | `0error_dev`            | Database password                            |
 | `SERVER_PORT`                | `8080`                  | Backend port                                 |
 | `CORS_ALLOWED_ORIGINS`       | `http://localhost:5173` | Browser origin allowed to call the API       |
-| `OPENAI_API_KEY`             | unset                   | Enables generated drills and coaching        |
-| `OPENAI_MODEL`               | `gpt-4.1-mini`          | Chat model                                   |
+| `AI_API_KEY`                 | unset                   | Enables generated drills and coaching        |
+| `AI_BASE_URL`                | `https://api.openai.com/v1` | OpenAI-compatible endpoint                |
+| `AI_MODEL`                   | `gpt-4.1-mini`          | Chat model                                   |
 | `DRILL_AI_ENABLED`           | `true`                  | Background drill prefetch                    |
 | `TELEMETRY_RAW_RETENTION_DAYS` | `30`                  | Raw keystroke retention                      |
 | `TELEMETRY_MAX_BATCH_SIZE`   | `500`                   | Events accepted per telemetry request        |
@@ -124,6 +125,22 @@ Copy `.env.example` values into the backend process environment as needed.
 The frontend takes one optional variable, `VITE_API_BASE_URL`. Leave it empty in
 development so the Vite proxy is used; set it when the API lives on another
 origin.
+
+The AI variables name the model, not the vendor. They work with OpenAI directly
+or with Gemini through its OpenAI-compatible base URL:
+
+```bash
+AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+AI_MODEL=gemini-3.8-flash
+```
+
+Use a model the key can access; Gemini retires older models for new accounts. The
+server checks nothing beyond the provider's answer: a retired or overloaded model
+simply falls back.
+
+The key itself comes from `AI_API_KEY` (or `OPENAI_API_KEY`, still accepted) and
+is never written into the repository. Without one, everything still runs:
+drills fall back to the static pool and coaching to `FallbackFeedback`.
 
 ## Rules the server enforces
 
@@ -290,8 +307,8 @@ frontend/
 - The server stores single expected/actual characters per keystroke, never the
   typed text. It re-derives each keystroke's correctness from those characters
   and never trusts client-calculated aggregates.
-- Without `OPENAI_API_KEY` the app is fully functional: drills come from the
-  static pool and coaching from the deterministic fallback.
+- Without `AI_API_KEY` the app is fully functional: drills come from the static
+  pool and coaching from the deterministic fallback.
 - Postgres is the only service required to run. Nothing is cached out of process.
 
 The build history, the reasoning behind each decision, and the remaining work
