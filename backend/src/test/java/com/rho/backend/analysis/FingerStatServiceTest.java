@@ -1,5 +1,6 @@
 package com.rho.backend.analysis;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,9 +12,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,20 +36,69 @@ class FingerStatServiceTest {
 	private FingerStatRepository repository;
 
 	@Test
-	void recordingMergesTheAnalyzedFingersForTheTier() {
+	void recordingMergesAndCopiesTheAnalyzedFingersForTheTier() {
 		when(repository.merge(any(), anyInt(), any())).thenReturn(Mono.empty());
+		when(repository.recordSession(any(), any(), anyInt(), any())).thenReturn(Mono.empty());
 		List<KeystrokeEvent> events = List.of(
 				key(0, 0, "a", true),
 				key(1, 1, "s", false));
 
-		service().recordSession(USER_ID, 2, events).block();
+		service().recordSession(SESSION_ID, USER_ID, 2, events).block();
 
 		@SuppressWarnings("unchecked")
-		ArgumentCaptor<List<FingerStat>> fingers = ArgumentCaptor.forClass(List.class);
-		verify(repository).merge(eq(USER_ID), eq(2), fingers.capture());
-		assertThat(fingers.getValue()).containsExactly(
+		ArgumentCaptor<List<FingerStat>> merged = ArgumentCaptor.forClass(List.class);
+		verify(repository).merge(eq(USER_ID), eq(2), merged.capture());
+		assertThat(merged.getValue()).containsExactly(
 				new FingerStat(Finger.LEFT_RING, 1, 1, 0, 100),
 				new FingerStat(Finger.LEFT_PINKY, 1, 0, 0, 100));
+
+		// The same counters are kept once per session for the trend.
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<FingerStat>> copied = ArgumentCaptor.forClass(List.class);
+		verify(repository).recordSession(
+				eq(SESSION_ID), eq(USER_ID), eq(2), copied.capture());
+		assertThat(copied.getValue()).isEqualTo(merged.getValue());
+	}
+
+	@Test
+	void trendReadsTheRecentAttemptsOldestFirst() {
+		when(repository.findRecentAttempts(USER_ID, 2, Finger.LEFT_RING, 5)).thenReturn(
+				Flux.just(
+						FingerTrend.Attempt.from(
+								OffsetDateTime.parse("2026-11-20T10:00:00Z"), 2, 0, 0, 600),
+						FingerTrend.Attempt.from(
+								OffsetDateTime.parse("2026-11-18T10:00:00Z"), 1, 1, 1, 900),
+						FingerTrend.Attempt.from(
+								OffsetDateTime.parse("2026-11-16T10:00:00Z"), 1, 0, 0, 1_200)));
+
+		FingerTrend trend = service().trend(USER_ID, 2, "LEFT_RING", 5).block();
+
+		assertThat(trend).isNotNull();
+		assertThat(trend.finger()).isEqualTo("LEFT_RING");
+		assertThat(trend.label()).isEqualTo("Left ring");
+		assertThat(trend.attempts()).extracting(FingerTrend.Attempt::meanMs)
+				.containsExactly(1_200, 900, 300);
+	}
+
+	@Test
+	void trendRejectsAnUnknownFinger() {
+		StepVerifier.create(service().trend(USER_ID, 2, "LEFT_TOE", 5))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.BAD_REQUEST);
+				})
+				.verify();
+	}
+
+	@Test
+	void trendKeepsTheLimitInsideItsRange() {
+		StepVerifier.create(service().trend(USER_ID, 2, "LEFT_RING", 0))
+				.expectError(ResponseStatusException.class)
+				.verify();
+		StepVerifier.create(service().trend(USER_ID, 2, "LEFT_RING", 11))
+				.expectError(ResponseStatusException.class)
+				.verify();
 	}
 
 	@Test

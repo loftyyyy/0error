@@ -32,9 +32,10 @@ whatever pair or finger still makes you hesitate.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
-  steady reach. The weakest pair is also followed across recent completed drills:
-  "dk: mean 610 ms → 480 ms over your last 3 drills." It is extra context, so a
-  failed read leaves the focus note standing. Raw charts are deliberately absent.
+  steady reach. Each is also followed across recent completed drills: "dk: mean
+  610 ms → 480 ms over your last 3 drills" for the pair, and "Left ring: mean
+  720 ms → 560 ms over your last 2 drills" for the reach. They are extra context,
+  so a failed read leaves the note standing. Raw charts are deliberately absent.
   The gate outcome is also announced through a polite live region.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
@@ -176,7 +177,8 @@ configured, deterministic sentences otherwise. The prompt sees the session
 metrics, the focus pairs, and the weak reach.
 
 **Retention.** Raw keystrokes are purged after 30 days. Session aggregates, pair
-aggregates, per-session pair counts, and finger aggregates are kept indefinitely. A daily sweep marks
+aggregates, per-session pair and finger counts, and finger aggregates are kept
+indefinitely. A daily sweep marks
 sessions untouched for a day as `ABANDONED`, with `ended_at` set to the last
 activity, so `ACTIVE` keeps meaning "still open". A second sweep removes guests
 that have no session at all and no activity for 30 days: sign-in writes a row,
@@ -211,6 +213,7 @@ person.
 | GET    | `/api/v1/progress/weak-pairs?tier=`    | Pair aggregates, weakest first                      |
 | GET    | `/api/v1/progress/weak-pairs/trend?tier=&pair=&limit=` | One pair across recent sessions, oldest first; 1–10, default 5 |
 | GET    | `/api/v1/progress/fingers?tier=`       | Per-finger aggregates, weakest first                |
+| GET    | `/api/v1/progress/fingers/trend?tier=&finger=&limit=` | One reach across recent sessions, oldest first; 1–10, default 5 |
 | GET    | `/actuator/health`                     | Liveness and readiness probes                       |
 
 A telemetry batch carries `{ batchId, sessionId, sentAt, events[] }`; each event

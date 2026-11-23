@@ -425,7 +425,7 @@ function ResultPanel({
 
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote key={result.tier} tier={result.tier} />
-      <FingerNote tier={result.tier} />
+      <FingerNote key={result.tier} tier={result.tier} />
       <RecentDrills tier={result.tier} />
 
       <button

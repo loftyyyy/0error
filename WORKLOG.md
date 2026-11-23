@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  139 tests pass, including the Postgres-backed acceptance test.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 90 tests in 16 files, oxlint clean,
+  143 tests pass, including the Postgres-backed acceptance test.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 95 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional: without `OPENAI_API_KEY` drills come from the static pool and
@@ -20,7 +20,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The result panel now follows the weakest focus pair across completed drills. A completion also copies its pair counts into `session_weak_pairs` (V9), one row per pair per session, so `GET /progress/weak-pairs/trend?tier=&pair=&limit=` can return the last sessions oldest first. The focus note adds "dk: mean 610 ms → 480 ms over your last 3 drills", fetched only for the weakest pair and dropped silently if it fails. The copy is aggregates only, never typed text, and survives the keystroke purge. Replaying a completion adds no second point. Tests: a service test pins oldest-first order and pair validation, an integration test completes two sessions and proves the replay does not add a third point, an App test asserts the sentence and the single-pair request, and API tests cover the window and malformed bodies. |
+| `HEAD`    | The reach note now follows the weakest repeated finger across completed drills, mirroring the pair trend. A completion copies its finger counters into `session_finger_stats` (V10), one row per finger per session, and `GET /progress/fingers/trend?tier=&finger=&limit=` returns recent sessions oldest first. The note adds "Left ring: mean 720 ms → 560 ms over your last 2 drills", fetched only when the reach clears the same two-attempt and score floors the note already uses, and dropped silently if it fails. A single stumble therefore produces neither the note nor a request. The copy is counts only, survives the keystroke purge, and a replayed completion adds no point. Tests: a service test pins order, unknown fingers, and the limit; an integration test proves ordering and replay; an App test asserts the sentence and that an unproven reach makes no trend call; API tests cover the window and malformed bodies. |
+| `8359f2d` | The result panel follows the weakest focus pair across completed drills. `session_weak_pairs` (V9) keeps one row per pair per session, and `GET /progress/weak-pairs/trend` returns the recent sessions oldest first. The note adds "dk: mean 610 ms → 480 ms over your last 3 drills", fetched only for the weakest pair and dropped silently if it fails. |
 | `1f0836e` | The result panel reads the practised tier's direction from the same history window: "Home row over your last 4 drills: accuracy 91.2% → 97.5% · median 610 ms → 380 ms." It filters by tier so another tier never blends in, shows nothing below two attempts, and draws no chart. |
 | `e299df0` | A completion answered `404` or `409` is terminal: the panel says the attempt cannot be scored, leaves the tier untouched, and offers "Start a fresh drill" instead of retrying forever. A network or server failure still keeps the queued keystrokes and the retry path. |
 | `d28943b` | A daily sweep removes guests that never started a drill and have been idle for 30 days. Sign-in writes a users row, so one-time browsers would otherwise accumulate forever; a guest with any session keeps its row because the session carries aggregates. Issuances and other child rows cascade, and a partial `users (updated_at) where kind = 'GUEST'` index keeps the scan small. A Postgres test proves an old empty guest and its fetched drill go, while a fresh guest, an old guest with a session, and a registered user stay. |
@@ -148,6 +149,10 @@ commit `HEAD`; older rows keep their real hashes.
   typist felt. The copy happens in the completion transaction and conflicts do
   nothing, so replay cannot add a point. Old sessions have no split and the trend
   simply waits for two new attempts rather than inventing history.
+- **The reach trend borrows the note's own floor.** A finger trend is fetched only
+  when the weakest reach already clears the two-attempt and score floors that
+  show the reach note. One stumble therefore costs neither a sentence nor a
+  request, and the two notes stay honest about the same evidence.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -208,8 +213,8 @@ dropdb -h localhost -p 55434 -U 0error error_fresh
 ```
 
 Use a database name that does not begin with a digit: Postgres then needs it
-quoted, which this shell drops. On 2026-11-22 V1–V9 applied to an empty database
-and all 139 tests passed.
+quoted, which this shell drops. On 2026-11-23 V1–V10 applied to an empty database
+and all 143 tests passed.
 
 Browser check (backend + Vite at `http://localhost:5173/`): the first drill
 rendered, the idle hint lit the `a` key and named the left pinky, and the theme
@@ -226,14 +231,15 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A per-finger trend.** Pair movement is visible now, but the finger note still
-   shows only the rolling total. Mirroring `session_weak_pairs` for fingers would
-   say whether a reach is improving. Lower value than the pair trend, because the
-   drill picker targets pairs first and fingers second.
-4. **A practice-this-pair action.** The focus line names the weakest pair and the
+3. **A practice-this-pair action.** The focus line names the weakest pair and the
    next drill already leans on it, but there is no explicit control to drill it
    on demand. Worth adding only if the automatic targeting proves too subtle in
    real use.
+4. **Backfill recent sessions.** `session_weak_pairs` and `session_finger_stats`
+   start empty, so a returning guest needs two new drills before either trend
+   appears. Sessions still inside the 30-day keystroke window could be split with
+   the existing analyzers and inserted once. Correctness does not need it; it only
+   removes the cold start.
 
 ## Housekeeping
 

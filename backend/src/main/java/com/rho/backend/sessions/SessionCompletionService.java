@@ -83,7 +83,7 @@ public class SessionCompletionService {
 									return weakPairs.recordSession(
 											sessionId, userId, session.tier(), rawEvents)
 											.then(fingers.recordSession(
-													userId, session.tier(), rawEvents))
+													sessionId, userId, session.tier(), rawEvents))
 											.then(markCompleted(
 													sessionId, outcome.passed(), stored))
 											.thenReturn(response);

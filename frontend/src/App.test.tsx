@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import type { FingerStat, FingerTrend } from './features/progress/fingerApi'
 import type { WeakPair, WeakPairTrend } from './features/progress/weakPairApi'
 import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { countPendingBatches } from './features/telemetry/keystrokeQueue'
@@ -164,6 +165,12 @@ let focusPairs: WeakPair[] = []
 /** The trend the panel reads for that pair; null means the request fails. */
 let focusTrend: WeakPairTrend | null = null
 
+/** The reaches the result panel reports; empty means no reach note. */
+let fingerStats: FingerStat[] = []
+
+/** The trend the panel reads for the weakest reach; null means it fails. */
+let fingerTrend: FingerTrend | null = null
+
 const FEEDBACK = 'event: token\ndata: Keep it smooth.\n\nevent: done\ndata: [DONE]\n\n'
 
 function json(body: unknown, status = 200) {
@@ -220,7 +227,11 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     return json(focusTrend)
   }
   if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: focusPairs })
-  if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: [] })
+  if (url.includes('/api/v1/progress/fingers/trend')) {
+    if (fingerTrend === null) return json({ error: 'unavailable' }, 503)
+    return json(fingerTrend)
+  }
+  if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: fingerStats })
   if (url.includes('/api/v1/progress')) return json(progressResponse)
   if (url.includes('/api/v1/drills/next')) {
     drillIssued += 1
@@ -288,6 +299,8 @@ beforeEach(async () => {
   recentFailure = null
   focusPairs = []
   focusTrend = null
+  fingerStats = []
+  fingerTrend = null
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
@@ -682,6 +695,84 @@ describe('App', () => {
     await waitFor(() => bodyText().includes('Your next drills lean on'), 'the focus note')
     expect(bodyText()).toContain('dk')
     expect(bodyText()).not.toContain('mean')
+  })
+
+  it('follows the weakest reach across recent drills', async () => {
+    fingerStats = [
+      {
+        finger: 'LEFT_RING',
+        label: 'Left ring',
+        attempts: 6,
+        errors: 2,
+        pauses: 3,
+        meanMs: 640,
+        score: 0.32,
+      },
+    ]
+    fingerTrend = {
+      tier: 0,
+      finger: 'LEFT_RING',
+      label: 'Left ring',
+      attempts: [
+        {
+          recordedAt: '2026-11-16T10:00:00Z',
+          attempts: 2,
+          errors: 1,
+          pauses: 1,
+          meanMs: 720,
+        },
+        {
+          recordedAt: '2026-11-20T10:00:00Z',
+          attempts: 2,
+          errors: 0,
+          pauses: 0,
+          meanMs: 560,
+        },
+      ],
+    }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('mean 720 ms \u2192 560 ms'),
+      'the weakest reach trend',
+    )
+    expect(bodyText()).toContain('Left ring, still finding its rhythm.')
+    expect(bodyText()).toContain(
+      'Left ring: mean 720 ms \u2192 560 ms over your last 2 drills.',
+    )
+    // Only the weakest repeated reach is followed, with a bounded window.
+    const trendCall = calls.find((call) => call.url.includes('/fingers/trend'))
+    expect(trendCall?.url).toContain('finger=LEFT_RING')
+    expect(trendCall?.url).toContain('limit=5')
+  })
+
+  it('leaves out the reach note when the weak reach is unproven', async () => {
+    fingerStats = [
+      {
+        finger: 'LEFT_RING',
+        label: 'Left ring',
+        attempts: 1,
+        errors: 1,
+        pauses: 0,
+        meanMs: 640,
+        score: 0.32,
+      },
+    ]
+    fingerTrend = {
+      tier: 0,
+      finger: 'LEFT_RING',
+      label: 'Left ring',
+      attempts: [],
+    }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Gate passed.'), 'the result')
+    expect(bodyText()).not.toContain('still finding its rhythm')
+    expect(calls.some((call) => call.url.includes('/fingers/trend'))).toBe(false)
   })
 
   it('still shows the score when the history request fails', async () => {

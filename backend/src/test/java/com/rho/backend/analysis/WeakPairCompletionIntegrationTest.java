@@ -33,6 +33,9 @@ class WeakPairCompletionIntegrationTest {
 	private WeakPairService weakPairs;
 
 	@Autowired
+	private FingerStatService fingers;
+
+	@Autowired
 	private DatabaseClient databaseClient;
 
 	@Test
@@ -128,6 +131,55 @@ class WeakPairCompletionIntegrationTest {
 			// Replaying a completion must not add a third point to the trend.
 			completion.complete(userId, second).block();
 			assertThat(weakPairs.trend(userId, 0, "dk", 5).block().attempts()).hasSize(2);
+		}
+		finally {
+			databaseClient.sql("DELETE FROM users WHERE id = :id")
+					.bind("id", userId)
+					.fetch()
+					.rowsUpdated()
+					.block();
+		}
+	}
+
+	@Test
+	void theFingerTrendTracksOneReachAcrossCompletedSessions() {
+		UUID userId = UUID.randomUUID();
+		UUID first = UUID.randomUUID();
+		UUID second = UUID.randomUUID();
+
+		try {
+			insertUser(userId);
+
+			insertSession(userId, first);
+			insertEvent(first, 0, 0, "d", true, 100);
+			insertEvent(first, 1, 1, "k", true, 900);
+			completion.complete(userId, first).block();
+
+			databaseClient.sql("""
+							UPDATE session_finger_stats
+							SET recorded_at = now() - interval '1 day'
+							WHERE session_id = :id
+							""")
+					.bind("id", first)
+					.fetch()
+					.rowsUpdated()
+					.block();
+
+			insertSession(userId, second);
+			insertEvent(second, 0, 0, "d", true, 100);
+			insertEvent(second, 1, 1, "k", true, 500);
+			completion.complete(userId, second).block();
+
+			FingerTrend trend = fingers.trend(userId, 0, "RIGHT_MIDDLE", 5).block();
+
+			assertThat(trend).isNotNull();
+			assertThat(trend.label()).isEqualTo("Right middle");
+			assertThat(trend.attempts()).extracting(FingerTrend.Attempt::meanMs)
+					.containsExactly(900, 500);
+
+			completion.complete(userId, second).block();
+			assertThat(fingers.trend(userId, 0, "RIGHT_MIDDLE", 5).block().attempts())
+					.hasSize(2);
 		}
 		finally {
 			databaseClient.sql("DELETE FROM users WHERE id = :id")

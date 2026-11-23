@@ -35,4 +35,21 @@ public class FingerController {
 		catalogue.require(tier);
 		return fingers.report(principal.userId(), tier);
 	}
+
+	/**
+	 * How one reach moved across the guest's recent completed drills. The result
+	 * panel reads the weakest repeat from the report and follows it here.
+	 */
+	@GetMapping("/fingers/trend")
+	public Mono<FingerTrend> trend(
+			@RequestParam(defaultValue = "0") int tier,
+			@RequestParam String finger,
+			@RequestParam(defaultValue = "" + FingerStatService.DEFAULT_TREND_LIMIT) int limit,
+			@AuthenticationPrincipal GuestPrincipal principal) {
+		if (principal == null) {
+			return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Guest token required"));
+		}
+		catalogue.require(tier);
+		return fingers.trend(principal.userId(), tier, finger, limit);
+	}
 }
