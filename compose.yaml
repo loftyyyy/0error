@@ -7,9 +7,10 @@ services:
       POSTGRES_USER: 0error
       POSTGRES_PASSWORD: 0error_dev
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - 0error-pgdata:/var/lib/postgresql/data
+      # Postgres 18 keeps clusters in a versioned subdirectory of this mount.
+      - 0error-pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U 0error -d 0error"]
       interval: 5s

@@ -100,9 +100,16 @@ npm run dev
 Open <http://localhost:5173>. Vite proxies `/api` to port 8080, and the backend
 allows that exact origin, so use `localhost:5173` rather than `127.0.0.1:5173`.
 
-The defaults in `docker-compose.yml` match the backend's defaults
+The defaults in `compose.yaml` match the backend's defaults
 (`0error` / `0error_dev` on port 5432). Flyway creates the schema on first
-start.
+start. If another Postgres already owns 5432, choose a host port:
+
+```bash
+POSTGRES_PORT=55432 docker compose up -d postgres
+DB_PORT=55432 ./mvnw spring-boot:run
+```
+
+On Windows PowerShell, set `$env:POSTGRES_PORT='55432'` before `docker compose`.
 
 ## Configuration
 

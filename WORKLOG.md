@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The backend now covers the remaining frontend needs without more schema. `GET /drills/next` also accepts `finger`, validated against the tier and mutually exclusive with `focus`, so a reach can be practised on demand. `GET /sessions/active` returns the newest open drill with its text, charset, start time, stored keystroke count, and `nextSeq`, or `204`; it is owner-scoped and ignores completed sessions. A daily `TrendBackfillJob` rebuilds missing per-session pair and finger rows from raw keystrokes still inside retention, writing only the per-session copies so rolling totals never move. Tests: finger focus in service, controller, and HTTP; resume with events, zero events, completed, foreign, and no token; backfill rebuild, skip of purged sessions, idempotency, and unchanged rolling aggregates. Total 196 tests, 4 live ones gated. |
+| `HEAD`    | Compose now works with Postgres 18. The volume mounts `/var/lib/postgresql` instead of the pre-18 `/var/lib/postgresql/data`, and the host port is `${POSTGRES_PORT:-5432}:5432` so a local server can coexist. The duplicate `docker-compose.yml` is gone; `compose.yaml` is the one file. Proven on 2026-11-25 with `postgres:18-alpine`, a healthy container on host port 55432, PostgreSQL 18.7, V1–V10 applied from empty, and the full 196-test suite (4 live tests skipped) green against the container. |
+| `98e75d9` | Backend gaps closed without schema: `finger` focus on drills, `GET /sessions/active` with `nextSeq`, and a daily `TrendBackfillJob` that repairs missing per-session trend rows from retained keystrokes without re-merging rolling totals. |
 | `11c5c99` | `GET /drills/next` accepts an explicit `focus` pair, validated against the tier charset and the lock. Malformed focus, an outside pair, and a locked tier answer `400`, `400`, and `403`. Controller tests now cover drills, progress, fingers, weak pairs, and sessions; an HTTP test proves the focus path. |
 | `a918c56` | AI got a fallback provider. `AiChatClient` keeps the Spring AI primary and builds a second OpenAI-compatible model from the `AI_FALLBACK_*` variables; a failed or blank primary moves to the fallback, and a stream that already emitted keeps its partial answer. Offline failover tests plus gated live tests for Nemotron and Gemma passed. |
 | `23a535a` | AI became a provider choice: `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` replaced the OpenAI-only names, with the old names still accepted. Gemini works through its OpenAI-compatible endpoint. A gated live test boots the real context and checks a drill and a streamed note. |
@@ -244,6 +245,19 @@ Use a database name that does not begin with a digit: Postgres then needs it
 quoted, which this shell drops. On 2026-11-25 V1–V10 applied to an empty database;
 196 tests ran, with the 4 gated live-AI tests skipped, so 192 actually executed.
 
+Compose check, same day:
+
+```bash
+POSTGRES_PORT=55432 docker compose up -d postgres
+docker compose ps                     # healthy, 0.0.0.0:55432->5432
+RUN_INTEGRATION_TESTS=true DB_PORT=55432 DB_PASSWORD=0error_dev DB_NAME=0error \
+  ./mvnw test                         # 196 tests, 4 live ones skipped
+```
+
+The container answered as PostgreSQL 18.7 and Flyway applied V1–V10 from empty.
+Port 5432 was already owned by Laragon on this machine, hence the override; the
+compose default stays 5432.
+
 Live AI check — off by default because it spends real requests. Primary provider:
 
 ```bash
@@ -282,11 +296,13 @@ pass are under `backend/.openchamber/screenshots/`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Live AI is proven; Docker is not.** NVIDIA Nemotron and the Gemma fallback
+1. **Live AI and Compose are proven.** NVIDIA Nemotron and the Gemma fallback
    both passed the gated live tests on 2026-11-24. Gemini remains a supported
    configuration but its earlier attempt was refused by the provider (`503` and a
-   free-tier `429`), so re-check it only if that provider is chosen. Docker is
-   unavailable, so `docker compose up -d postgres` has never run here.
+   free-tier `429`), so re-check it only if that provider is chosen. Compose was
+   fixed and exercised on 2026-11-25: `postgres:18-alpine` needs the volume at
+   `/var/lib/postgresql`, and the host port is now `${POSTGRES_PORT:-5432}` so a
+   local Postgres can coexist.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
