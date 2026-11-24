@@ -64,6 +64,32 @@ describe('fetchNextDrill', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
   })
 
+  it('asks for one focus pair when practising a weakness', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse(drill))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { fetchNextDrill } = await import('./drillApi')
+    await fetchNextDrill(1, undefined, 'dk')
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/v1/drills/next?tier=1&focus=dk')
+  })
+
+  it('asks for one reach when practising a finger', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse(drill))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { fetchNextDrill } = await import('./drillApi')
+    await fetchNextDrill(1, undefined, undefined, 'LEFT_RING')
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/v1/drills/next?tier=1&finger=LEFT_RING')
+  })
+
   it('reports a locked tier instead of showing a drill', async () => {
     vi.stubGlobal(
       'fetch',
@@ -133,5 +159,20 @@ describe('fetchDrillSet', () => {
     expect(urls[0]).toContain(exclude('previous drill'))
     expect(urls[1]).toContain(exclude(drill.text))
     expect(urls[2]).toContain(exclude(secondDrill.text))
+  })
+
+  it('carries one focus pair into every drill of the attempt', async () => {
+    const queue = [drill, secondDrill, thirdDrill]
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse(queue.shift()))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { fetchDrillSet } = await import('./drillApi')
+    await fetchDrillSet(1, undefined, 'dk')
+
+    const urls = fetchMock.mock.calls.map(([url]) => String(url))
+    expect(urls).toHaveLength(3)
+    expect(urls.every((url) => url.includes('focus=dk'))).toBe(true)
   })
 })

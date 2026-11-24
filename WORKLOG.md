@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   196 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 192 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 95 tests in 16 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 100 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Compose now works with Postgres 18. The volume mounts `/var/lib/postgresql` instead of the pre-18 `/var/lib/postgresql/data`, and the host port is `${POSTGRES_PORT:-5432}:5432` so a local server can coexist. The duplicate `docker-compose.yml` is gone; `compose.yaml` is the one file. Proven on 2026-11-25 with `postgres:18-alpine`, a healthy container on host port 55432, PostgreSQL 18.7, V1–V10 applied from empty, and the full 196-test suite (4 live tests skipped) green against the container. |
+| `HEAD`    | The result panel can now act on its own analysis. The focus line offers "Practise dk" and the reach line offers "Practise Left ring"; either starts a fresh three-drill attempt with `focus=` or `finger=` sent on every drill request, so the server targets that weakness immediately. The action reuses the existing loading pipeline, keeps the same tier, and excludes the previous tail. `fetchNextDrill` and `fetchDrillSet` gained the two optional parameters; tests pin the URL for each, prove all three drills carry the focus, and click each action in the App to prove three focused requests. Frontend now 100 tests. |
+| `752a93c` | Compose now works with Postgres 18: the volume mounts `/var/lib/postgresql`, host port is `${POSTGRES_PORT:-5432}`, and the duplicate `docker-compose.yml` is gone. Healthy container on 55432, PostgreSQL 18.7, V1 to V10 from empty, full backend suite green. |
 | `98e75d9` | Backend gaps closed without schema: `finger` focus on drills, `GET /sessions/active` with `nextSeq`, and a daily `TrendBackfillJob` that repairs missing per-session trend rows from retained keystrokes without re-merging rolling totals. |
 | `11c5c99` | `GET /drills/next` accepts an explicit `focus` pair, validated against the tier charset and the lock. Malformed focus, an outside pair, and a locked tier answer `400`, `400`, and `403`. Controller tests now cover drills, progress, fingers, weak pairs, and sessions; an HTTP test proves the focus path. |
 | `a918c56` | AI got a fallback provider. `AiChatClient` keeps the Spring AI primary and builds a second OpenAI-compatible model from the `AI_FALLBACK_*` variables; a failed or blank primary moves to the fallback, and a stream that already emitted keeps its partial answer. Offline failover tests plus gated live tests for Nemotron and Gemma passed. |
@@ -306,14 +307,11 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A practice-this-pair or reach button.** Backend support is ready:
-   `GET /drills/next?tier=&focus=` or `&finger=`. The frontend only needs the
-   control next to the focus and reach lines. The pair still has to clear the tier
-   charset, so the button should send an existing focus pair rather than arbitrary
-   text.
-4. **A resume path in the browser.** `GET /sessions/active` answers with the open
-   drill and `nextSeq`. The frontend does not call it yet; it still starts a fresh
-   drill on load. Wiring it would remove the abandoned-session gap after a reload.
+3. **A resume path in the browser.** `GET /sessions/active` answers with the open
+   drill and `nextSeq`, but not the typed position, and the frontend still starts
+   a fresh drill on load. Wiring it would remove the abandoned-session gap after a
+   reload. The backend must return the position; the typing engine also needs an
+   initial position and sequence.
 
 ## Housekeeping
 

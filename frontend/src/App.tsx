@@ -41,6 +41,10 @@ interface ActiveDrill {
 interface NextDrill {
   tier?: number
   exclude?: string
+  /** One pair the attempt should exercise, when practising a weakness. */
+  focus?: string
+  /** One reach the attempt should exercise. */
+  finger?: string
 }
 
 type Phase = 'loading' | 'ready' | 'scoring' | 'result' | 'error'
@@ -66,7 +70,7 @@ function App() {
         setProgress(summary)
 
         const tier = next.tier ?? activeTier(summary)
-        const fetched = await fetchDrillSet(tier, next.exclude)
+        const fetched = await fetchDrillSet(tier, next.exclude, next.focus, next.finger)
         const session = await createServerSession({
           clientSessionId: newClientSessionId(),
           drillIds: fetched.drillIds,
@@ -95,8 +99,13 @@ function App() {
     }
   }, [attempt, next])
 
-  const startNext = (tier?: number, exclude?: string) => {
-    setNext({ tier, exclude })
+  const startNext = (
+    tier?: number,
+    exclude?: string,
+    focus?: string,
+    finger?: string,
+  ) => {
+    setNext({ tier, exclude, focus, finger })
     setDrill(null)
     setResult(null)
     setError('')
@@ -188,6 +197,8 @@ function App() {
             result={result}
             progress={progress}
             onNext={() => startNext(result.unlockedTier ?? drill.tier, drill.tail)}
+            onPracticePair={(pair) => startNext(drill.tier, drill.tail, pair)}
+            onPracticeFinger={(finger) => startNext(drill.tier, drill.tail, undefined, finger)}
           />
         ) : null}
         {isTyping && drill ? (
@@ -360,11 +371,15 @@ function ResultPanel({
   result,
   progress,
   onNext,
+  onPracticePair,
+  onPracticeFinger,
 }: {
   drill: ActiveDrill
   result: SessionCompletion
   progress: ProgressSummary | null
   onNext: () => void
+  onPracticePair: (pair: string) => void
+  onPracticeFinger: (finger: string) => void
 }) {
   // Once nothing above this tier is locked there is no next unlock to promise.
   const nextLocked = progress?.tiers.find(
@@ -424,8 +439,8 @@ function ResultPanel({
       {progress ? <TierLadder progress={progress} currentTier={result.tier} /> : null}
 
       <CoachNote sessionId={drill.sessionId} />
-      <FocusNote key={result.tier} tier={result.tier} />
-      <FingerNote key={result.tier} tier={result.tier} />
+      <FocusNote key={result.tier} tier={result.tier} onPractice={onPracticePair} />
+      <FingerNote key={result.tier} tier={result.tier} onPractice={onPracticeFinger} />
       <RecentDrills tier={result.tier} />
 
       <button

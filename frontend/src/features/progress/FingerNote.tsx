@@ -21,7 +21,13 @@ function trendLine(trend: FingerTrend): string | null {
  * followed by how it has moved across recent sessions. It ignores a single
  * stumble and disappears if analysis is down.
  */
-export function FingerNote({ tier }: { tier: number }) {
+export function FingerNote({
+  tier,
+  onPractice,
+}: {
+  tier: number
+  onPractice?: (finger: string) => void
+}) {
   const [weakest, setWeakest] = useState<FingerStat | null>(null)
   const [trend, setTrend] = useState<FingerTrend | null>(null)
 
@@ -89,6 +95,15 @@ export function FingerNote({ tier }: { tier: number }) {
         <p className="mt-1.5 text-xs text-stone-400 dark:text-stone-500">
           {direction}
         </p>
+      ) : null}
+      {onPractice ? (
+        <button
+          type="button"
+          onClick={() => onPractice(weakest.finger)}
+          className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+        >
+          Practise {weakest.label}
+        </button>
       ) : null}
     </>
   )

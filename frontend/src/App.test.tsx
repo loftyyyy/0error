@@ -775,6 +775,87 @@ describe('App', () => {
     expect(calls.some((call) => call.url.includes('/fingers/trend'))).toBe(false)
   })
 
+  it('practises the weakest pair on request', async () => {
+    focusPairs = [
+      {
+        pair: 'dk',
+        attempts: 6,
+        errors: 2,
+        pauses: 3,
+        meanMs: 940,
+        score: 0.48,
+      },
+    ]
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Practise dk'), 'the practice action')
+    const practice = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent?.includes('Practise dk'),
+    )
+    expect(practice).toBeDefined()
+
+    await act(async () => {
+      practice?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(
+      () => calls.some((call) => call.url.includes('/drills/next') && call.url.includes('focus=dk')),
+      'a focused drill request',
+    )
+    const focused = calls.filter(
+      (call) => call.url.includes('/drills/next') && call.url.includes('focus=dk'),
+    )
+    expect(focused).toHaveLength(3)
+    expect(focused.every((call) => !call.url.includes('finger='))).toBe(true)
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the focused drill')
+  })
+
+  it('practises the weakest reach on request', async () => {
+    fingerStats = [
+      {
+        finger: 'LEFT_RING',
+        label: 'Left ring',
+        attempts: 6,
+        errors: 2,
+        pauses: 3,
+        meanMs: 640,
+        score: 0.32,
+      },
+    ]
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('Practise Left ring'),
+      'the reach practice action',
+    )
+    const practice = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent?.includes('Practise Left ring'),
+    )
+    expect(practice).toBeDefined()
+
+    await act(async () => {
+      practice?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(
+      () =>
+        calls.some(
+          (call) =>
+            call.url.includes('/drills/next') && call.url.includes('finger=LEFT_RING'),
+        ),
+      'a reach-focused drill request',
+    )
+    const focused = calls.filter(
+      (call) => call.url.includes('/drills/next') && call.url.includes('finger=LEFT_RING'),
+    )
+    expect(focused).toHaveLength(3)
+    expect(focused.every((call) => !call.url.includes('focus='))).toBe(true)
+  })
+
   it('still shows the score when the history request fails', async () => {
     recentFailure = 500
 

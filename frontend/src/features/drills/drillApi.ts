@@ -32,12 +32,17 @@ export interface DrillSet {
   tail: string
 }
 
-export async function fetchDrillSet(tier: number, exclude?: string): Promise<DrillSet> {
+export async function fetchDrillSet(
+  tier: number,
+  exclude?: string,
+  focus?: string,
+  finger?: string,
+): Promise<DrillSet> {
   const drills: Drill[] = []
   let previous = exclude
 
   for (let index = 0; index < DRILLS_PER_ATTEMPT; index += 1) {
-    const drill = await fetchNextDrill(tier, previous)
+    const drill = await fetchNextDrill(tier, previous, focus, finger)
     drills.push(drill)
     previous = drill.text
   }
@@ -56,11 +61,19 @@ export async function fetchDrillSet(tier: number, exclude?: string): Promise<Dri
 
 /**
  * Fetches the next drill. `exclude` asks the server to avoid the previous
- * text, so a retry does not repeat the same practice string.
+ * text, so a retry does not repeat the same practice string. `focus` or
+ * `finger` requests a specific weakness, one or the other.
  */
-export async function fetchNextDrill(tier: number, exclude?: string): Promise<Drill> {
+export async function fetchNextDrill(
+  tier: number,
+  exclude?: string,
+  focus?: string,
+  finger?: string,
+): Promise<Drill> {
   const query = new URLSearchParams({ tier: String(tier) })
   if (exclude) query.set('exclude', exclude)
+  if (focus) query.set('focus', focus)
+  if (finger) query.set('finger', finger)
 
   const response = await authedFetch(`/api/v1/drills/next?${query.toString()}`, {
     headers: { Accept: 'application/json' },

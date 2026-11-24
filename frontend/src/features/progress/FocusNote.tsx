@@ -17,7 +17,13 @@ function trendLine(trend: WeakPairTrend): string | null {
  * followed by how the weakest one has moved across recent sessions. It stays
  * out of the way while loading and disappears if analysis is down.
  */
-export function FocusNote({ tier }: { tier: number }) {
+export function FocusNote({
+  tier,
+  onPractice,
+}: {
+  tier: number
+  onPractice?: (pair: string) => void
+}) {
   const [pairs, setPairs] = useState<WeakPair[]>([])
   const [trend, setTrend] = useState<WeakPairTrend | null>(null)
 
@@ -68,6 +74,7 @@ export function FocusNote({ tier }: { tier: number }) {
       ? labels[0]
       : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
   const direction = trend ? trendLine(trend) : null
+  const weakest = pairs[0]
 
   return (
     <>
@@ -80,6 +87,15 @@ export function FocusNote({ tier }: { tier: number }) {
         <p className="mt-1.5 text-xs text-stone-400 dark:text-stone-500">
           {direction}
         </p>
+      ) : null}
+      {onPractice && weakest ? (
+        <button
+          type="button"
+          onClick={() => onPractice(weakest.pair)}
+          className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+        >
+          Practise {formatPairLabel(weakest.pair)}
+        </button>
       ) : null}
     </>
   )

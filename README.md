@@ -37,6 +37,9 @@ whatever pair or finger still makes you hesitate.
   720 ms → 560 ms over your last 2 drills" for the reach. They are extra context,
   so a failed read leaves the note standing. Raw charts are deliberately absent.
   The gate outcome is also announced through a polite live region.
+- Each note offers one quiet action: "Practise dk" or "Practise Left ring". It
+  starts a fresh attempt with that weakness sent to the server, so the same
+  target is exercised without waiting for analysis to surface it again.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
   three failed attempts.
