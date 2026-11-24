@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  145 tests, of which the 2 live-AI tests are gated and skipped without a key;
-  the other 143 pass, including the Postgres-backed acceptance test.
+  153 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 149 pass, including the Postgres-backed acceptance test.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 95 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | AI is now a provider choice, not an OpenAI assumption. The existing OpenAI-compatible starter reads `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`, with `OPENAI_API_KEY`/`OPENAI_MODEL` still accepted as fallbacks. Gemini plugs in through `https://generativelanguage.googleapis.com/v1beta/openai` and a model the key can access; `.env.example` and the README show both providers. No key enters the repository. A gated `LiveAiSmokeTest` boots the real context and asks the model for one drill and one streamed coaching note, then checks the tier validator; it runs only with `RUN_AI_LIVE_TESTS=true` so the default suite stays offline. On 2026-11-24 the key authenticated and Spring AI reached Gemini, but generation returned `503` high demand and one `429` free-tier limit, so live output is still unproven while the fallback keeps serving. |
+| `HEAD`    | AI now has a primary and a fallback provider. `AiChatClient` keeps the Spring AI primary (`AI_*`) and builds a second OpenAI-compatible model from `AI_FALLBACK_API_KEY`, `AI_FALLBACK_BASE_URL`, `AI_FALLBACK_MODEL`, and `AI_FALLBACK_TEMPERATURE`. A failed or blank primary moves to the fallback; a stream that already emitted keeps its partial answer instead of splicing providers. Both generators now call one `complete`/`stream` seam. `AiChatClientTest` proves primary choice, error and blank fallback, pre-token stream fallback, partial-stream preservation, and the no-provider case. Gated live tests prove NVIDIA Nemotron writes a valid drill and streams coaching, and that Gemma serves both when the primary is pointed at a missing model; both passed on 2026-11-24. |
+| `23a535a` | AI became a provider choice: `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` replaced the OpenAI-only names, with the old names still accepted. Gemini works through its OpenAI-compatible endpoint. A gated live test boots the real context and checks a drill and a streamed note. |
 | `28bd12a` | The reach note follows the weakest repeated finger across completed drills. `session_finger_stats` (V10) keeps one row per finger per session, and `GET /progress/fingers/trend` returns recent sessions oldest first. The note adds "Left ring: mean 720 ms → 560 ms over your last 2 drills", fetched only when the reach clears the note's own evidence floor and dropped silently if it fails. |
 | `8359f2d` | The result panel follows the weakest focus pair across completed drills. `session_weak_pairs` (V9) keeps one row per pair per session, and `GET /progress/weak-pairs/trend` returns the recent sessions oldest first. The note adds "dk: mean 610 ms → 480 ms over your last 3 drills", fetched only for the weakest pair and dropped silently if it fails. |
 | `1f0836e` | The result panel reads the practised tier's direction from the same history window: "Home row over your last 4 drills: accuracy 91.2% → 97.5% · median 610 ms → 380 ms." It filters by tier so another tier never blends in, shows nothing below two attempts, and draws no chart. |
@@ -156,12 +157,14 @@ commit `HEAD`; older rows keep their real hashes.
   when the weakest reach already clears the two-attempt and score floors that
   show the reach note. One stumble therefore costs neither a sentence nor a
   request, and the two notes stay honest about the same evidence.
-- **The model is configuration, not code.** One OpenAI-compatible client serves
-  OpenAI, Gemini, and any compatible gateway through `AI_BASE_URL` and
-  `AI_MODEL`; the fallback path never stops working because a provider is absent,
-  retired, or busy. The key lives only in the environment. A live test is gated
-  because it spends a request and needs the network, not because the feature is
-  optional.
+- **The model is configuration, not code.** One OpenAI-compatible client shape
+  serves OpenAI, Gemini, NVIDIA, and any compatible gateway through `AI_BASE_URL`
+  and `AI_MODEL`; the fallback repeats that shape with its own key, URL, and model.
+  The fallback is tried only when the primary errors, times out, or returns
+  nothing. A stream that already emitted tokens keeps its partial answer rather
+  than splicing two providers together. The deterministic drills and coaching
+  remain the last resort when both providers are absent or busy. Keys live only in
+  the environment.
 - **Sign-in is paced in the process.** New guests are the only unauthenticated
   write in the API, so one address gets 30 in a burst and one per two seconds
   after that. Rotating a token is untouched. The bucket resets on restart and is
@@ -223,23 +226,36 @@ dropdb -h localhost -p 55434 -U 0error error_fresh
 
 Use a database name that does not begin with a digit: Postgres then needs it
 quoted, which this shell drops. On 2026-11-24 V1–V10 applied to an empty database;
-145 tests ran, with the 2 gated live-AI tests skipped, so 143 actually executed.
+153 tests ran, with the 4 gated live-AI tests skipped, so 149 actually executed.
 
-Live AI check — off by default because it spends a real request:
+Live AI check — off by default because it spends real requests. Primary provider:
 
 ```bash
 RUN_AI_LIVE_TESTS=true AI_API_KEY=<key> \
-  AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai \
-  AI_MODEL=gemini-3.8-flash \
-  RUN_INTEGRATION_TESTS=true DB_NAME=error_ai DB_PORT=55434 DB_PASSWORD='' \
+  AI_BASE_URL=https://integrate.api.nvidia.com/v1 \
+  AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b \
+  RUN_INTEGRATION_TESTS=true DB_NAME=error_nv DB_PORT=55434 DB_PASSWORD='' \
   ./mvnw test -Dtest=LiveAiSmokeTest
 ```
 
-On 2026-11-24 the Gemini key authenticated and Spring AI reached the provider, but
-every generation answered `503` high demand and the coaching call added a `429`
-free-tier limit of five requests per minute for `gemini-3.8-flash`. The gated test
-is in place; rerun it when the provider has capacity. Static drills and fallback
-coaching keep the app usable meanwhile.
+Fallback provider — the primary is pointed at a model that does not exist, so any
+output must come from the fallback:
+
+```bash
+RUN_AI_FAILOVER_TESTS=true \
+  AI_API_KEY=<primary key> AI_BASE_URL=https://integrate.api.nvidia.com/v1 \
+  AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b \
+  AI_FALLBACK_API_KEY=<fallback key> \
+  AI_FALLBACK_BASE_URL=https://integrate.api.nvidia.com/v1 \
+  AI_FALLBACK_MODEL=google/gemma-4-31b-it \
+  RUN_INTEGRATION_TESTS=true DB_NAME=error_nv DB_PORT=55434 DB_PASSWORD='' \
+  ./mvnw test -Dtest=LiveAiFailoverSmokeTest
+```
+
+On 2026-11-24 both passed: Nemotron wrote a valid drill and streamed coaching
+(2/2, 28 s), and Gemma served both when the primary returned `404` (2/2, 108 s).
+Gemini still works through the same configuration, but its earlier live attempt
+was refused by the provider with `503` and a free-tier `429`.
 
 Browser check (backend + Vite at `http://localhost:5173/`): the first drill
 rendered, the idle hint lit the `a` key and named the left pinky, and the theme
@@ -250,12 +266,11 @@ pass are under `backend/.openchamber/screenshots/`.
 
 None of these blocks the app; they are the next things worth doing, in order.
 
-1. **Live AI output waits on provider capacity.** The Gemini key authenticates
-   and Spring AI reaches the provider, but on 2026-11-24 every generation returned
-   `503` high demand plus a `429` five-per-minute free-tier limit on
-   `gemini-3.8-flash`. `LiveAiSmokeTest` is ready; rerun it when the provider has
-   room. Docker is also unavailable, so `docker compose up -d postgres` has never
-   run here.
+1. **Live AI is proven; Docker is not.** NVIDIA Nemotron and the Gemma fallback
+   both passed the gated live tests on 2026-11-24. Gemini remains a supported
+   configuration but its earlier attempt was refused by the provider (`503` and a
+   free-tier `429`), so re-check it only if that provider is chosen. Docker is
+   unavailable, so `docker compose up -d postgres` has never run here.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.

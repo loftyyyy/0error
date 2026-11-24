@@ -1,14 +1,10 @@
 package com.rho.backend.feedback;
 
-import java.util.Optional;
-
 import com.rho.backend.ai.AiChatClient;
 
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
 /**
  * Streams an LLM coaching note. The prompt is deliberately narrow: a few calm
@@ -31,19 +27,7 @@ public class OpenAiFeedbackGenerator implements FeedbackGenerator {
 
 	@Override
 	public Flux<String> stream(FeedbackContext context) {
-		return Flux.defer(() -> {
-					Optional<ChatClient> client = chat.maybeGet();
-					if (client.isEmpty()) {
-						return Flux.<String>empty();
-					}
-					return client.get()
-							.prompt()
-							.system(SYSTEM_PROMPT)
-							.user(userPrompt(context))
-							.stream()
-							.content();
-				})
-				.subscribeOn(Schedulers.boundedElastic());
+		return chat.stream(SYSTEM_PROMPT, userPrompt(context));
 	}
 
 	static String userPrompt(FeedbackContext context) {

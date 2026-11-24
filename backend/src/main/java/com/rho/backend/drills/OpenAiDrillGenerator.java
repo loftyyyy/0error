@@ -7,7 +7,6 @@ import com.rho.backend.ai.AiChatClient;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 /**
  * OpenAI-backed drill generation. It is only ever called from the background
@@ -46,14 +45,9 @@ public class OpenAiDrillGenerator implements DrillGenerator {
 			return Mono.empty();
 		}
 
-		return Mono.fromCallable(() -> chat.maybeGet()
-					.map(client -> clean(client.prompt()
-							.system(SYSTEM_PROMPT)
-							.user(userPrompt(tier, focus, exclude))
-							.call()
-							.content()))
-					.orElse(null))
-				.subscribeOn(Schedulers.boundedElastic());
+		return chat.complete(SYSTEM_PROMPT, userPrompt(tier, focus, exclude))
+				.map(OpenAiDrillGenerator::clean)
+				.filter(text -> text != null);
 	}
 
 	static String userPrompt(TierDefinition tier, List<String> focusPairs, String exclude) {

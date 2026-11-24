@@ -55,6 +55,13 @@ management:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  ai:
+    # Tried when the primary provider errors, times out, or returns nothing.
+    fallback:
+      api-key: ${AI_FALLBACK_API_KEY:unset}
+      base-url: ${AI_FALLBACK_BASE_URL:https://integrate.api.nvidia.com/v1}
+      model: ${AI_FALLBACK_MODEL:google/gemma-4-31b-it}
+      temperature: ${AI_FALLBACK_TEMPERATURE:0.5}
   drills:
     ai:
       enabled: ${DRILL_AI_ENABLED:true}

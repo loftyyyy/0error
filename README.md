@@ -116,8 +116,11 @@ Copy `.env.example` values into the backend process environment as needed.
 | `SERVER_PORT`                | `8080`                  | Backend port                                 |
 | `CORS_ALLOWED_ORIGINS`       | `http://localhost:5173` | Browser origin allowed to call the API       |
 | `AI_API_KEY`                 | unset                   | Enables generated drills and coaching        |
-| `AI_BASE_URL`                | `https://api.openai.com/v1` | OpenAI-compatible endpoint                |
-| `AI_MODEL`                   | `gpt-4.1-mini`          | Chat model                                   |
+| `AI_BASE_URL`                | `https://api.openai.com/v1` | Primary OpenAI-compatible endpoint        |
+| `AI_MODEL`                   | `gpt-4.1-mini`          | Primary chat model                           |
+| `AI_FALLBACK_API_KEY`        | unset                   | Enables the fallback provider                |
+| `AI_FALLBACK_BASE_URL`       | `https://integrate.api.nvidia.com/v1` | Fallback endpoint             |
+| `AI_FALLBACK_MODEL`          | `google/gemma-4-31b-it` | Fallback chat model                          |
 | `DRILL_AI_ENABLED`           | `true`                  | Background drill prefetch                    |
 | `TELEMETRY_RAW_RETENTION_DAYS` | `30`                  | Raw keystroke retention                      |
 | `TELEMETRY_MAX_BATCH_SIZE`   | `500`                   | Events accepted per telemetry request        |
@@ -126,21 +129,25 @@ The frontend takes one optional variable, `VITE_API_BASE_URL`. Leave it empty in
 development so the Vite proxy is used; set it when the API lives on another
 origin.
 
-The AI variables name the model, not the vendor. They work with OpenAI directly
-or with Gemini through its OpenAI-compatible base URL:
+The AI variables name the model, not the vendor. They work with any
+OpenAI-compatible endpoint, and a second provider can sit behind the first:
 
 ```bash
-AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-AI_MODEL=gemini-3.8-flash
+AI_BASE_URL=https://integrate.api.nvidia.com/v1
+AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b
+AI_FALLBACK_BASE_URL=https://integrate.api.nvidia.com/v1
+AI_FALLBACK_MODEL=google/gemma-4-31b-it
 ```
 
-Use a model the key can access; Gemini retires older models for new accounts. The
-server checks nothing beyond the provider's answer: a retired or overloaded model
-simply falls back.
+The fallback is tried when the primary errors, times out, or returns nothing;
+the deterministic text remains the last resort. For Gemini, use
+`https://generativelanguage.googleapis.com/v1beta/openai` and a model the key can
+access, such as `gemini-3.8-flash`.
 
-The key itself comes from `AI_API_KEY` (or `OPENAI_API_KEY`, still accepted) and
-is never written into the repository. Without one, everything still runs:
-drills fall back to the static pool and coaching to `FallbackFeedback`.
+The keys come from `AI_API_KEY` and `AI_FALLBACK_API_KEY`
+(`OPENAI_API_KEY` is still accepted for the primary) and are never written into
+the repository. Without them, everything still runs: drills fall back to the
+static pool and coaching to `FallbackFeedback`.
 
 ## Rules the server enforces
 
