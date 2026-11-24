@@ -32,8 +32,9 @@ class SessionControllerTest {
 	private final SessionService sessions = mock(SessionService.class);
 	private final SessionCompletionService completion = mock(SessionCompletionService.class);
 	private final SessionHistoryService history = mock(SessionHistoryService.class);
+	private final SessionResumeService resume = mock(SessionResumeService.class);
 	private final SessionController controller =
-			new SessionController(sessions, completion, history);
+			new SessionController(sessions, completion, history, resume);
 
 	@Test
 	void everyRouteRejectsAGuestWithoutAToken() {
@@ -46,8 +47,36 @@ class SessionControllerTest {
 				.expectError(ResponseStatusException.class).verify();
 		StepVerifier.create(controller.complete(SESSION_ID, null))
 				.expectError(ResponseStatusException.class).verify();
+		StepVerifier.create(controller.active(null))
+				.expectError(ResponseStatusException.class).verify();
 
-		verifyNoInteractions(sessions, completion, history);
+		verifyNoInteractions(sessions, completion, history, resume);
+	}
+
+	@Test
+	void anOpenDrillIsReturnedForResume() {
+		ActiveSessionResponse active = new ActiveSessionResponse(
+				SESSION_ID, 0, "Home row", "asdf jkl;", "asdfjkl; ",
+				OffsetDateTime.now(), 4, 3);
+		when(resume.find(USER_ID)).thenReturn(Mono.just(java.util.Optional.of(active)));
+
+		ResponseEntity<ActiveSessionResponse> response =
+				controller.active(PRINCIPAL).block();
+
+		assertThat(response).isNotNull();
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isEqualTo(active);
+	}
+
+	@Test
+	void noOpenDrillAnswers204() {
+		when(resume.find(USER_ID)).thenReturn(Mono.just(java.util.Optional.empty()));
+
+		ResponseEntity<ActiveSessionResponse> response =
+				controller.active(PRINCIPAL).block();
+
+		assertThat(response).isNotNull();
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 	}
 
 	@Test

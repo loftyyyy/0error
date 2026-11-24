@@ -124,6 +124,8 @@ Copy `.env.example` values into the backend process environment as needed.
 | `DRILL_AI_ENABLED`           | `true`                  | Background drill prefetch                    |
 | `TELEMETRY_RAW_RETENTION_DAYS` | `30`                  | Raw keystroke retention                      |
 | `TELEMETRY_MAX_BATCH_SIZE`   | `500`                   | Events accepted per telemetry request        |
+| `TREND_BACKFILL_CRON`        | `0 45 3 * * *`          | Daily repair of per-session trend rows       |
+| `TREND_BACKFILL_LIMIT`       | `1000`                  | Sessions repaired per run                    |
 
 The frontend takes one optional variable, `VITE_API_BASE_URL`. Leave it empty in
 development so the Vite proxy is used; set it when the API lives on another
@@ -227,11 +229,12 @@ person.
 | Method | Path                                   | Purpose                                             |
 | ------ | -------------------------------------- | --------------------------------------------------- |
 | POST   | `/api/v1/auth/guest`                   | Create or rotate a guest token; `429` when paced    |
-| GET    | `/api/v1/drills/next?tier=&focus=&exclude=` | Next drill; `focus` is one two-character pair the tier allows; `403` when locked |
+| GET    | `/api/v1/drills/next?tier=&focus=&finger=&exclude=` | Next drill; one pair or one finger may be requested; `403` when locked |
 | POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
 | POST   | `/api/v1/sessions/{id}/complete`       | Score once; a retry replays the stored answer       |
 | GET    | `/api/v1/sessions/recent?limit=`       | Own completed drills, newest first; 1–20, default 5 |
+| GET    | `/api/v1/sessions/active`              | Open drill for a returning tab, or `204`; includes `nextSeq` |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
 | GET    | `/api/v1/progress`                     | Tiers, effective thresholds, unlock timestamps      |
 | GET    | `/api/v1/progress/weak-pairs?tier=`    | Pair aggregates, weakest first                      |

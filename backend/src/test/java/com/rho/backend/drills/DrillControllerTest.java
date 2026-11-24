@@ -27,7 +27,7 @@ class DrillControllerTest {
 
 	@Test
 	void aGuestWithoutATokenIsRejected() {
-		StepVerifier.create(controller.next(0, null, null, null))
+		StepVerifier.create(controller.next(0, null, null, null, null))
 				.expectErrorSatisfies(error -> {
 					assertThat(error).isInstanceOf(ResponseStatusException.class);
 					assertThat(((ResponseStatusException) error).getStatusCode())
@@ -41,12 +41,25 @@ class DrillControllerTest {
 	void tierFocusAndExcludeReachTheService() {
 		DrillResponse expected = new DrillResponse(
 				UUID.randomUUID(), 2, "Top row", "qwerty", "AI", "qwer qwer", 9);
-		when(drills.next(USER_ID, 2, "bn", "qwer qwer"))
+		when(drills.next(USER_ID, 2, "bn", null, "qwer qwer"))
 				.thenReturn(Mono.just(expected));
 
-		DrillResponse response = controller.next(2, "bn", "qwer qwer", PRINCIPAL).block();
+		DrillResponse response = controller.next(2, "bn", null, "qwer qwer", PRINCIPAL).block();
 
 		assertThat(response).isEqualTo(expected);
-		verify(drills).next(USER_ID, 2, "bn", "qwer qwer");
+		verify(drills).next(USER_ID, 2, "bn", null, "qwer qwer");
+	}
+
+	@Test
+	void aFingerFocusAlsoReachesTheService() {
+		DrillResponse expected = new DrillResponse(
+				UUID.randomUUID(), 1, "Top row", "qwerty", "STATIC", "qwer qwer", 9);
+		when(drills.next(USER_ID, 1, null, "LEFT_RING", null))
+				.thenReturn(Mono.just(expected));
+
+		DrillResponse response = controller.next(1, null, "LEFT_RING", null, PRINCIPAL).block();
+
+		assertThat(response).isEqualTo(expected);
+		verify(drills).next(USER_ID, 1, null, "LEFT_RING", null);
 	}
 }

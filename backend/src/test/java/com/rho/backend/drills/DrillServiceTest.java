@@ -219,6 +219,60 @@ class DrillServiceTest {
 	}
 
 	@Test
+	void explicitFingerSkipsAnalysisAndTargetsTheReach() {
+		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
+		DrillFocus reach = new DrillFocus(List.of(), Finger.RIGHT_MIDDLE);
+		when(aiDrills.take(0, reach, null)).thenReturn(Optional.empty());
+
+		DrillResponse drill = service().next(USER_ID, 0, null, "RIGHT_MIDDLE", null).block();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.source()).isEqualTo("STATIC");
+		assertThat(drill.text()).isNotBlank();
+		verifyNoInteractions(weakPairs, fingers);
+		verify(aiDrills).take(0, reach, null);
+	}
+
+	@Test
+	void focusAndFingerTogetherAreRejected() {
+		StepVerifier.create(service().next(USER_ID, 0, "fj", "RIGHT_MIDDLE", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(((ResponseStatusException) error).getReason())
+							.isEqualTo("use focus or finger, not both");
+				})
+				.verify();
+	}
+
+	@Test
+	void anUnknownFingerIsRejected() {
+		StepVerifier.create(service().next(USER_ID, 0, null, "LEFT_TOE", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(((ResponseStatusException) error).getReason())
+							.isEqualTo("unknown finger");
+				})
+				.verify();
+	}
+
+	@Test
+	void explicitFingerStillRespectsTheTierLock() {
+		when(progress.isUnlocked(USER_ID, 1)).thenReturn(Mono.just(false));
+
+		StepVerifier.create(service().next(USER_ID, 1, null, "LEFT_RING", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.FORBIDDEN);
+				})
+				.verify();
+	}
+
+	@Test
 	void unknownTierIsBadRequest() {
 		StepVerifier.create(service().next(USER_ID, 9, null))
 				.expectErrorSatisfies(error -> {

@@ -26,11 +26,12 @@ public class DrillController {
 	public Mono<DrillResponse> next(
 			@RequestParam(defaultValue = "0") int tier,
 			@RequestParam(required = false) String focus,
+			@RequestParam(required = false) String finger,
 			@RequestParam(required = false) String exclude,
 			@AuthenticationPrincipal GuestPrincipal principal) {
 		if (principal == null) {
 			return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Guest token required"));
 		}
-		return drills.next(principal.userId(), tier, focus, exclude);
+		return drills.next(principal.userId(), tier, focus, finger, exclude);
 	}
 }

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.rho.backend.analysis.Finger;
 import com.rho.backend.analysis.FingerStatService;
 import com.rho.backend.analysis.WeakPairService;
 import com.rho.backend.progress.TierProgressService;
@@ -55,9 +56,20 @@ public class DrillService {
 	 * waiting for two attempts to make it appear.
 	 */
 	public Mono<DrillResponse> next(UUID userId, int tier, String focus, String exclude) {
+		return next(userId, tier, focus, null, exclude);
+	}
+
+	/**
+	 * Serves one drill. A non-blank {@code focus} pair or {@code finger} overrides
+	 * the automatic weakness analysis, so the browser can offer "practise this
+	 * pair" or "practise this reach" without waiting for two attempts to make it
+	 * appear. The two cannot be combined.
+	 */
+	public Mono<DrillResponse> next(
+			UUID userId, int tier, String focus, String finger, String exclude) {
 		return Mono.defer(() -> {
 			TierDefinition definition = catalogue.require(tier);
-			DrillFocus requested = explicitFocus(definition, focus);
+			DrillFocus requested = explicitFocus(definition, focus, finger);
 
 			return progress.isUnlocked(userId, tier)
 					.flatMap(unlocked -> {
@@ -83,22 +95,43 @@ public class DrillService {
 	}
 
 	/** Null means no explicit focus; anything malformed is a client error. */
-	private static DrillFocus explicitFocus(TierDefinition tier, String focus) {
-		if (focus == null || focus.isBlank()) {
-			return null;
-		}
-		if (focus.length() != 2) {
+	private static DrillFocus explicitFocus(
+			TierDefinition tier, String focus, String finger) {
+		boolean hasPair = focus != null && !focus.isBlank();
+		boolean hasFinger = finger != null && !finger.isBlank();
+		if (hasPair && hasFinger) {
 			throw new ResponseStatusException(
-					HttpStatus.BAD_REQUEST, "focus must be exactly two characters");
+					HttpStatus.BAD_REQUEST, "use focus or finger, not both");
 		}
-		for (char character : focus.toCharArray()) {
-			if (character < 0x20 || character > 0x7E || !tier.allows(character)) {
+		if (hasPair) {
+			if (focus.length() != 2) {
 				throw new ResponseStatusException(
-						HttpStatus.BAD_REQUEST,
-						"focus must use only characters this tier allows");
+						HttpStatus.BAD_REQUEST, "focus must be exactly two characters");
 			}
+			for (char character : focus.toCharArray()) {
+				if (character < 0x20 || character > 0x7E || !tier.allows(character)) {
+					throw new ResponseStatusException(
+							HttpStatus.BAD_REQUEST,
+							"focus must use only characters this tier allows");
+				}
+			}
+			return DrillFocus.of(List.of(focus));
 		}
-		return DrillFocus.of(List.of(focus));
+		if (hasFinger) {
+			Finger parsed;
+			try {
+				parsed = Finger.valueOf(finger);
+			}
+			catch (IllegalArgumentException error) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown finger");
+			}
+			if (FocusedDrillBuilder.allowedKeys(tier, parsed).isEmpty()) {
+				throw new ResponseStatusException(
+						HttpStatus.BAD_REQUEST, "this tier has no keys for that finger");
+			}
+			return new DrillFocus(List.of(), parsed);
+		}
+		return null;
 	}
 
 	private Mono<DrillResponse> serve(

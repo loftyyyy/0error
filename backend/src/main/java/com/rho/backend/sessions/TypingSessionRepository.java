@@ -11,4 +11,7 @@ public interface TypingSessionRepository extends ReactiveCrudRepository<TypingSe
 	Mono<TypingSession> findByIdAndUserId(UUID id, UUID userId);
 
 	Mono<TypingSession> findByUserIdAndClientSessionId(UUID userId, UUID clientSessionId);
+
+	Mono<TypingSession> findFirstByUserIdAndStatusOrderByStartedAtDesc(
+			UUID userId, String status);
 }

@@ -60,6 +60,50 @@ class DrillFocusAcceptanceTest {
 	}
 
 	@Test
+	void aGuestCanAskForOneReachThroughHTTP() {
+		String token = guestToken();
+
+		DrillResponse drill = client.get()
+				.uri("/api/v1/drills/next?tier=0&finger=RIGHT_MIDDLE")
+				.headers(headers -> headers.setBearerAuth(token))
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(DrillResponse.class)
+				.returnResult()
+				.getResponseBody();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.text()).contains("k");
+
+		TierDefinition tier = new TierCatalogue().require(0);
+		assertThat(new DrillValidator().validate(drill.text(), tier))
+				.as("reach-focused drill must still fit the tier")
+				.isEmpty();
+	}
+
+	@Test
+	void anUnknownFingerIsRejected() {
+		String token = guestToken();
+
+		client.get()
+				.uri("/api/v1/drills/next?tier=0&finger=LEFT_TOE")
+				.headers(headers -> headers.setBearerAuth(token))
+				.exchange()
+				.expectStatus().isBadRequest();
+	}
+
+	@Test
+	void pairAndFingerFocusCannotBeCombined() {
+		String token = guestToken();
+
+		client.get()
+				.uri("/api/v1/drills/next?tier=0&focus=fj&finger=LEFT_RING")
+				.headers(headers -> headers.setBearerAuth(token))
+				.exchange()
+				.expectStatus().isBadRequest();
+	}
+
+	@Test
 	void aPairOutsideTheTierCharsetIsRejected() {
 		String token = guestToken();
 

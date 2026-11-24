@@ -26,14 +26,17 @@ public class SessionController {
 	private final SessionService sessions;
 	private final SessionCompletionService completion;
 	private final SessionHistoryService history;
+	private final SessionResumeService resume;
 
 	public SessionController(
 			SessionService sessions,
 			SessionCompletionService completion,
-			SessionHistoryService history) {
+			SessionHistoryService history,
+			SessionResumeService resume) {
 		this.sessions = sessions;
 		this.completion = completion;
 		this.history = history;
+		this.resume = resume;
 	}
 
 	@PostMapping
@@ -60,6 +63,22 @@ public class SessionController {
 		return history.recent(principal.userId(), limit)
 				.collectList()
 				.map(SessionHistoryResponse::new);
+	}
+
+	/**
+	 * The drill a returning tab can continue, or {@code 204} when nothing is
+	 * open. {@code nextSeq} lets telemetry resume without repeating a sequence.
+	 */
+	@GetMapping("/active")
+	public Mono<ResponseEntity<ActiveSessionResponse>> active(
+			@AuthenticationPrincipal GuestPrincipal principal) {
+		if (principal == null) {
+			return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Guest token required"));
+		}
+		return resume.find(principal.userId())
+				.map(found -> found
+						.map(ResponseEntity::ok)
+						.orElseGet(() -> ResponseEntity.noContent().build()));
 	}
 
 	@PostMapping("/{sessionId}/complete")
