@@ -1,5 +1,6 @@
 package com.rho.backend.drills;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,8 +46,18 @@ public class DrillService {
 	}
 
 	public Mono<DrillResponse> next(UUID userId, int tier, String exclude) {
+		return next(userId, tier, null, exclude);
+	}
+
+	/**
+	 * Serves one drill. A non-blank {@code focus} pair overrides the automatic
+	 * weakness analysis, so the browser can offer "practise this pair" without
+	 * waiting for two attempts to make it appear.
+	 */
+	public Mono<DrillResponse> next(UUID userId, int tier, String focus, String exclude) {
 		return Mono.defer(() -> {
 			TierDefinition definition = catalogue.require(tier);
+			DrillFocus requested = explicitFocus(definition, focus);
 
 			return progress.isUnlocked(userId, tier)
 					.flatMap(unlocked -> {
@@ -55,20 +66,39 @@ public class DrillService {
 									HttpStatus.FORBIDDEN, "Tier " + tier + " is locked"));
 						}
 
-						return Mono.zip(
-										weakPairs.focus(userId, tier),
-										fingers.focus(userId, tier))
-								.flatMap(focus -> serve(
-										userId,
-										definition,
-										new DrillFocus(
-												focus.getT1(),
-												focus.getT1().isEmpty()
-														? focus.getT2().orElse(null)
-														: null),
-										exclude));
+						Mono<DrillFocus> chosen = requested != null
+								? Mono.just(requested)
+								: Mono.zip(
+												weakPairs.focus(userId, tier),
+												fingers.focus(userId, tier))
+										.map(analysis -> new DrillFocus(
+												analysis.getT1(),
+												analysis.getT1().isEmpty()
+														? analysis.getT2().orElse(null)
+														: null));
+
+						return chosen.flatMap(target -> serve(userId, definition, target, exclude));
 					});
 		});
+	}
+
+	/** Null means no explicit focus; anything malformed is a client error. */
+	private static DrillFocus explicitFocus(TierDefinition tier, String focus) {
+		if (focus == null || focus.isBlank()) {
+			return null;
+		}
+		if (focus.length() != 2) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_REQUEST, "focus must be exactly two characters");
+		}
+		for (char character : focus.toCharArray()) {
+			if (character < 0x20 || character > 0x7E || !tier.allows(character)) {
+				throw new ResponseStatusException(
+						HttpStatus.BAD_REQUEST,
+						"focus must use only characters this tier allows");
+			}
+		}
+		return DrillFocus.of(List.of(focus));
 	}
 
 	private Mono<DrillResponse> serve(

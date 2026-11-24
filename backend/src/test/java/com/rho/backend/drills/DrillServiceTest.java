@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -154,6 +155,67 @@ class DrillServiceTest {
 		assertThat(drill).isNotNull();
 		assertThat(drill.source()).isEqualTo("STATIC");
 		assertThat(drill.text()).isEqualTo(targeted);
+	}
+
+	@Test
+	void explicitFocusSkipsAnalysisAndTargetsTheDrill() {
+		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
+		when(aiDrills.take(0, DrillFocus.of(List.of("fj")), null))
+				.thenReturn(Optional.empty());
+
+		DrillResponse drill = service().next(USER_ID, 0, "fj", null).block();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.source()).isEqualTo("STATIC");
+		assertThat(drill.text()).contains("fj");
+		verifyNoInteractions(weakPairs, fingers);
+		verify(aiDrills).take(0, DrillFocus.of(List.of("fj")), null);
+	}
+
+	@Test
+	void explicitFocusMustBeOnePairTheTierAllows() {
+		StepVerifier.create(service().next(USER_ID, 0, "f", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(((ResponseStatusException) error).getReason())
+							.isEqualTo("focus must be exactly two characters");
+				})
+				.verify();
+
+		StepVerifier.create(service().next(USER_ID, 0, "fz", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(((ResponseStatusException) error).getReason())
+							.isEqualTo("focus must use only characters this tier allows");
+				})
+				.verify();
+	}
+
+	@Test
+	void explicitFocusStillRespectsTheTierLock() {
+		when(progress.isUnlocked(USER_ID, 1)).thenReturn(Mono.just(false));
+
+		StepVerifier.create(service().next(USER_ID, 1, "fj", null))
+				.expectErrorSatisfies(error -> {
+					assertThat(error).isInstanceOf(ResponseStatusException.class);
+					assertThat(((ResponseStatusException) error).getStatusCode())
+							.isEqualTo(HttpStatus.FORBIDDEN);
+				})
+				.verify();
+	}
+
+	@Test
+	void blankFocusStillUsesTheWeaknessAnalysis() {
+		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
+
+		service().next(USER_ID, 0, "  ", null).block();
+
+		verify(weakPairs).focus(USER_ID, 0);
+		verify(fingers).focus(USER_ID, 0);
 	}
 
 	@Test

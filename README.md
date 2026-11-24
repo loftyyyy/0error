@@ -227,7 +227,7 @@ person.
 | Method | Path                                   | Purpose                                             |
 | ------ | -------------------------------------- | --------------------------------------------------- |
 | POST   | `/api/v1/auth/guest`                   | Create or rotate a guest token; `429` when paced    |
-| GET    | `/api/v1/drills/next?tier=&exclude=`   | Next drill; `403` when the tier is locked           |
+| GET    | `/api/v1/drills/next?tier=&focus=&exclude=` | Next drill; `focus` is one two-character pair the tier allows; `403` when locked |
 | POST   | `/api/v1/sessions`                     | Start from drill ids; idempotent per client id      |
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
 | POST   | `/api/v1/sessions/{id}/complete`       | Score once; a retry replays the stored answer       |

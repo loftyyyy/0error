@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  153 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 149 pass, including the Postgres-backed acceptance test.
+  178 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 174 pass, including the Postgres-backed acceptance tests.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 95 tests in 16 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | AI now has a primary and a fallback provider. `AiChatClient` keeps the Spring AI primary (`AI_*`) and builds a second OpenAI-compatible model from `AI_FALLBACK_API_KEY`, `AI_FALLBACK_BASE_URL`, `AI_FALLBACK_MODEL`, and `AI_FALLBACK_TEMPERATURE`. A failed or blank primary moves to the fallback; a stream that already emitted keeps its partial answer instead of splicing providers. Both generators now call one `complete`/`stream` seam. `AiChatClientTest` proves primary choice, error and blank fallback, pre-token stream fallback, partial-stream preservation, and the no-provider case. Gated live tests prove NVIDIA Nemotron writes a valid drill and streams coaching, and that Gemma serves both when the primary is pointed at a missing model; both passed on 2026-11-24. |
+| `HEAD`    | The drill endpoint accepts an explicit `focus` pair, so the frontend can offer "practise this pair" without waiting for the analysis to surface it. `DrillService` validates one two-character pair against the tier charset, keeps the lock check, and skips the weakness reads when focus is given. Malformed focus, a pair outside the tier, and a locked tier answer `400`, `400`, and `403`. Coverage grew from 153 to 178 tests: `DrillServiceTest` proves focus bypasses analysis and is validated, `DrillControllerTest`, `ProgressControllerTest`, `FingerControllerTest`, `WeakPairControllerTest`, and `SessionControllerTest` pin every route's authentication and delegation, and `DrillFocusAcceptanceTest` drives focus, charset rejection, malformed rejection, and lock over HTTP. |
+| `a918c56` | AI got a fallback provider. `AiChatClient` keeps the Spring AI primary and builds a second OpenAI-compatible model from the `AI_FALLBACK_*` variables; a failed or blank primary moves to the fallback, and a stream that already emitted keeps its partial answer. Offline failover tests plus gated live tests for Nemotron and Gemma passed. |
 | `23a535a` | AI became a provider choice: `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` replaced the OpenAI-only names, with the old names still accepted. Gemini works through its OpenAI-compatible endpoint. A gated live test boots the real context and checks a drill and a streamed note. |
 | `28bd12a` | The reach note follows the weakest repeated finger across completed drills. `session_finger_stats` (V10) keeps one row per finger per session, and `GET /progress/fingers/trend` returns recent sessions oldest first. The note adds "Left ring: mean 720 ms → 560 ms over your last 2 drills", fetched only when the reach clears the note's own evidence floor and dropped silently if it fails. |
 | `8359f2d` | The result panel follows the weakest focus pair across completed drills. `session_weak_pairs` (V9) keeps one row per pair per session, and `GET /progress/weak-pairs/trend` returns the recent sessions oldest first. The note adds "dk: mean 610 ms → 480 ms over your last 3 drills", fetched only for the weakest pair and dropped silently if it fails. |
@@ -77,6 +78,11 @@ commit `HEAD`; older rows keep their real hashes.
   issuance id; `POST /sessions` accepts only ids. The persisted session text is
   the source of every telemetry `expected` character. Ids are single-use,
   same-tier, owned, and expire after 10 minutes.
+- **An explicit focus overrides analysis, never validation.** `focus` is one
+  two-character pair; both keys must belong to the tier, and the tier must still
+  be unlocked. It skips the pair and finger reads, so a browser action costs one
+  query instead of three. The issue, validation, and lock rules stay identical to
+  an automatically focused drill.
 - **AI is off the critical path.** Drills are prefetched and cached; the static
   pool always answers. Coaching always has a deterministic fallback.
 - **Identity is a guest token.** No accounts; `X-Guest-Id` + `X-Guest-Token`
@@ -226,7 +232,7 @@ dropdb -h localhost -p 55434 -U 0error error_fresh
 
 Use a database name that does not begin with a digit: Postgres then needs it
 quoted, which this shell drops. On 2026-11-24 V1–V10 applied to an empty database;
-153 tests ran, with the 4 gated live-AI tests skipped, so 149 actually executed.
+178 tests ran, with the 4 gated live-AI tests skipped, so 174 actually executed.
 
 Live AI check — off by default because it spends real requests. Primary provider:
 
@@ -274,10 +280,10 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A practice-this-pair action.** The focus line names the weakest pair and the
-   next drill already leans on it, but there is no explicit control to drill it
-   on demand. Worth adding only if the automatic targeting proves too subtle in
-   real use.
+3. **A practice-this-pair button.** Backend support is ready:
+   `GET /drills/next?tier=&focus=`. The frontend only needs the control next to
+   the focus line. The pair still has to clear the tier charset, so the button
+   should send an existing focus pair rather than arbitrary text.
 4. **Backfill recent sessions.** `session_weak_pairs` and `session_finger_stats`
    start empty, so a returning guest needs two new drills before either trend
    appears. Sessions still inside the 30-day keystroke window could be split with
