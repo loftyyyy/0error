@@ -76,6 +76,8 @@ interface RecordedCall {
 }
 
 let calls: RecordedCall[] = []
+/** Flips to false after abandon so the next active check starts fresh. */
+let resumed = true
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -92,7 +94,13 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     body: typeof init?.body === 'string' ? init.body : null,
   })
 
-  if (url.includes('/api/v1/sessions/active')) return json(active)
+  if (url.includes('/api/v1/sessions/active')) {
+    return resumed ? json(active) : new Response(null, { status: 204 })
+  }
+  if (url.includes('/abandon')) {
+    resumed = false
+    return new Response(null, { status: 204 })
+  }
   if (url.includes('/api/v1/progress/weak-pairs')) return json({ tier: 0, pairs: [] })
   if (url.includes('/api/v1/progress/fingers')) return json({ tier: 0, fingers: [] })
   if (url.includes('/api/v1/progress')) return json(progress)
@@ -154,6 +162,7 @@ async function press(key: string) {
 beforeEach(async () => {
   window.localStorage.clear()
   calls = []
+  resumed = true
   vi.stubGlobal('fetch', fetchMock)
   vi.stubGlobal(
     'matchMedia',
@@ -192,6 +201,36 @@ describe('resume after reload', () => {
     expect(
       calls.some((call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST'),
     ).toBe(false)
+  })
+
+  it('starts over and does not bring the abandoned drill back', async () => {
+    await waitFor(() => shownText() === TEXT, 'the resumed drill text')
+
+    const startOver = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent?.includes('Start over'),
+    )
+    expect(startOver).toBeDefined()
+
+    await act(async () => {
+      startOver?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(
+      () => calls.some((call) => call.url.includes(`/sessions/${SESSION_ID}/abandon`)),
+      'the abandon request',
+    )
+    await waitFor(
+      () => calls.filter((call) => call.url.includes('/drills/next')).length === 3,
+      'a fresh drill set',
+    )
+
+    expect(
+      calls.some((call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST'),
+    ).toBe(true)
+    await waitFor(
+      () => !bodyText().includes('Picked up where you left off.'),
+      'the resume notice to clear',
+    )
   })
 
   it('keeps the stored sequence when the drill completes', async () => {

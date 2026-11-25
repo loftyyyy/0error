@@ -33,8 +33,9 @@ class SessionControllerTest {
 	private final SessionCompletionService completion = mock(SessionCompletionService.class);
 	private final SessionHistoryService history = mock(SessionHistoryService.class);
 	private final SessionResumeService resume = mock(SessionResumeService.class);
+	private final SessionAbandonService abandonment = mock(SessionAbandonService.class);
 	private final SessionController controller =
-			new SessionController(sessions, completion, history, resume);
+			new SessionController(sessions, completion, history, resume, abandonment);
 
 	@Test
 	void everyRouteRejectsAGuestWithoutAToken() {
@@ -49,8 +50,21 @@ class SessionControllerTest {
 				.expectError(ResponseStatusException.class).verify();
 		StepVerifier.create(controller.active(null))
 				.expectError(ResponseStatusException.class).verify();
+		StepVerifier.create(controller.abandon(SESSION_ID, null))
+				.expectError(ResponseStatusException.class).verify();
 
-		verifyNoInteractions(sessions, completion, history, resume);
+		verifyNoInteractions(sessions, completion, history, resume, abandonment);
+	}
+
+	@Test
+	void abandonForwardsTheOwnedSession() {
+		when(abandonment.abandon(USER_ID, SESSION_ID)).thenReturn(Mono.empty());
+
+		ResponseEntity<Void> response = controller.abandon(SESSION_ID, PRINCIPAL).block();
+
+		assertThat(response).isNotNull();
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+		verify(abandonment).abandon(USER_ID, SESSION_ID);
 	}
 
 	@Test

@@ -27,16 +27,19 @@ public class SessionController {
 	private final SessionCompletionService completion;
 	private final SessionHistoryService history;
 	private final SessionResumeService resume;
+	private final SessionAbandonService abandonment;
 
 	public SessionController(
 			SessionService sessions,
 			SessionCompletionService completion,
 			SessionHistoryService history,
-			SessionResumeService resume) {
+			SessionResumeService resume,
+			SessionAbandonService abandonment) {
 		this.sessions = sessions;
 		this.completion = completion;
 		this.history = history;
 		this.resume = resume;
+		this.abandonment = abandonment;
 	}
 
 	@PostMapping
@@ -79,6 +82,18 @@ public class SessionController {
 				.map(found -> found
 						.map(ResponseEntity::ok)
 						.orElseGet(() -> ResponseEntity.noContent().build()));
+	}
+
+	/** Closes an open drill so it no longer resumes. */
+	@PostMapping("/{sessionId}/abandon")
+	public Mono<ResponseEntity<Void>> abandon(
+			@PathVariable UUID sessionId,
+			@AuthenticationPrincipal GuestPrincipal principal) {
+		if (principal == null) {
+			return Mono.error(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Guest token required"));
+		}
+		return abandonment.abandon(principal.userId(), sessionId)
+				.thenReturn(ResponseEntity.noContent().build());
 	}
 
 	@PostMapping("/{sessionId}/complete")

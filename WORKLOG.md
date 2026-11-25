@@ -9,9 +9,9 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  198 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 194 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 115 tests in 18 files, oxlint clean,
+  203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 199 pass, including the Postgres-backed acceptance tests.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 119 tests in 18 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,8 +22,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | A resumed drill now shows the same key count and accuracy the server will score. `GET /sessions/active` adds `typedCount`, `scoredCount`, and `correctCount`, derived from non-warmup KEY events and the first attempt per position. The engine seeds typed, scored, correct, and the set of already-scored positions, so backspacing into restored text cannot count it twice. The App test now asserts "67% accurate" and "3 keys" on a resumed drill. Frontend 115 tests, backend 198. |
-| `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts, so resume metrics match server scoring. |
+| `HEAD`    | An open drill can be abandoned. `POST /sessions/{id}/abandon` closes only the owner's ACTIVE row, sets an honest `ended_at`, answers `204`, `404` for a foreign or missing drill, and `409` for one already completed. The resume card offers a quiet "Start over": it closes the session, then loads a fresh three-drill attempt, so reload no longer brings the old one back. Tests: HTTP abandon, resume stops offering it, foreign drill untouched, completed drill conflicts, unauthenticated rejection, API idempotence on `404`/`409`, and an App test proving abandon then a fresh drill set. Backend 203, frontend 119. |
+| `db67008` | Resume keeps the stored key count and accuracy; the engine seeds scored positions and never double counts restored text. |
+| `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts. |
 | `8f01e0b` | The drill shows one quiet line while keys wait locally: offline when the network fails, pending when the server asks for a retry. It clears when acknowledged. |
 | `bd56a3e` | A reload resumes the open drill. `GET /sessions/active` returns cursor, sequence, and active clock; the engine restores all three, marks three warmup keys, and the status says "Picked up where you left off." |
 | `4161611` | `GET /sessions/active` returns the cursor position and active time beside `nextSeq`, derived from the last stored keystroke. |
@@ -100,6 +101,10 @@ commit `HEAD`; older rows keep their real hashes.
   server will score. Earlier rhythm shading is not rebuilt; the progress bar
   carries the position. Only the owner sees it; completed attempts and other
   guests are invisible.
+- **Closing is explicit, not deletion.** "Start over" marks the owner's ACTIVE
+  session `ABANDONED` with the real end time; the row and its aggregates stay.
+  Telemetry for it is refused afterwards, and the resume check stops returning it.
+  A foreign or missing drill is a `404`, never a silent success.
 - **Backfill is repair, not recomputation.** The daily job rebuilds per-session
   trend rows only where they are missing and raw keystrokes still exist. It never
   merges the rolling aggregates again, because those already counted the session;

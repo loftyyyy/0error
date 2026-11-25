@@ -8,6 +8,7 @@ import { FocusNote } from './features/progress/FocusNote'
 import { activeTier, fetchProgress } from './features/progress/progressApi'
 import type { ProgressSummary } from './features/progress/progressApi'
 import {
+  abandonServerSession,
   completeServerSession,
   createServerSession,
   fetchActiveSession,
@@ -158,6 +159,14 @@ function App() {
     setAttempt((value) => value + 1)
   }
 
+  /** Close a resumed drill on the server, then start a clean attempt. */
+  const startOver = async () => {
+    const current = drill
+    if (!current) return
+    await abandonServerSession(current.sessionId).catch(() => undefined)
+    startNext(current.tier)
+  }
+
   const score = async () => {
     if (!drill) return
     setPhase('scoring')
@@ -240,6 +249,7 @@ function App() {
           <Drill
             drill={drill}
             scoring={phase === 'scoring'}
+            onStartOver={drill.resume ? () => void startOver() : undefined}
             onComplete={() => {
               void score()
             }}
@@ -305,9 +315,10 @@ interface DrillProps {
   drill: ActiveDrill
   scoring: boolean
   onComplete: () => void
+  onStartOver?: () => void
 }
 
-function Drill({ drill, scoring, onComplete }: DrillProps) {
+function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
   const { containerRef, snapshot, notice } = useKeystrokeCapture({
     sessionId: drill.sessionId,
     text: drill.text,
@@ -402,6 +413,16 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
       </div>
 
       <SyncLine />
+
+      {onStartOver ? (
+        <button
+          type="button"
+          onClick={onStartOver}
+          className="mt-1 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+        >
+          Start over
+        </button>
+      ) : null}
 
       <KeyboardGuide
         character={drill.text[snapshot.index] ?? null}

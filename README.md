@@ -43,7 +43,8 @@ whatever pair or finger still makes you hesitate.
 - A reload asks the server for an open drill. When one exists it resumes at the
   stored cursor, telemetry sequence, key count, and accuracy, with three warmup
   keys after the break. Earlier rhythm shading is not replayed; the progress bar
-  still shows position.
+  still shows position. A quiet "Start over" closes it on the server and loads a
+  fresh drill, so the abandoned one does not return.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
   three failed attempts.
@@ -252,6 +253,7 @@ person.
 | POST   | `/api/v1/sessions/{id}/complete`       | Score once; a retry replays the stored answer       |
 | GET    | `/api/v1/sessions/recent?limit=`       | Own completed drills, newest first; 1–20, default 5 |
 | GET    | `/api/v1/sessions/active`              | Open drill for a returning tab, or `204`; cursor, sequence, clock, counts |
+| POST   | `/api/v1/sessions/{id}/abandon`        | Close an open drill; `204`, or `409` if already closed |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
 | GET    | `/api/v1/progress`                     | Tiers, effective thresholds, unlock timestamps      |
 | GET    | `/api/v1/progress/weak-pairs?tier=`    | Pair aggregates, weakest first                      |

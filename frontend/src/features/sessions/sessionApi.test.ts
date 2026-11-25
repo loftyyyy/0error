@@ -261,6 +261,54 @@ describe('fetchRecentSessions', () => {
   })
 })
 
+describe('abandonServerSession', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const storage = new MemoryStorage()
+    storage.setItem(GUEST_TOKEN_KEY, 'g_existing')
+    storage.setItem(GUEST_ID_KEY, 'guest-existing')
+    vi.stubGlobal('localStorage', storage)
+  })
+
+  it('closes the open drill', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { abandonServerSession } = await import('./sessionApi')
+    await abandonServerSession('session-1')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/v1/sessions/session-1/abandon')
+    expect(init?.method).toBe('POST')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
+  })
+
+  it('treats an already closed drill as done', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 409 })),
+    )
+
+    const { abandonServerSession } = await import('./sessionApi')
+
+    await expect(abandonServerSession('session-1')).resolves.toBeUndefined()
+  })
+
+  it('reports a close that could not be recorded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'unavailable' }, 503)),
+    )
+
+    const { abandonServerSession } = await import('./sessionApi')
+
+    await expect(abandonServerSession('session-1')).rejects.toThrow(
+      'Could not close this drill (503)',
+    )
+  })
+})
 describe('fetchActiveSession', () => {
   const active = {
     sessionId: 'session-resume',

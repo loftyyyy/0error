@@ -177,6 +177,22 @@ export async function fetchActiveSession(): Promise<ActiveSession | null> {
 }
 
 /**
+ * Closes an open drill so a reload does not resume it. `404` and `409` mean the
+ * server already considers it closed; only a real failure is surfaced.
+ */
+export async function abandonServerSession(sessionId: string): Promise<void> {
+  const response = await authedFetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/abandon`,
+    { method: 'POST', headers: { Accept: 'application/json' } },
+  )
+
+  if (response.ok || response.status === 404 || response.status === 409) {
+    return
+  }
+  throw new Error(`Could not close this drill (${response.status})`)
+}
+
+/**
  * Closes the session and asks the server to score it. Telemetry must be
  * flushed first: the server recomputes every metric from the raw events.
  */
