@@ -19,9 +19,11 @@ import type { RecentSession, SessionCompletion } from './features/sessions/sessi
 import { flushSession } from './features/telemetry/telemetryBuffer'
 import { SyncLine } from './features/telemetry/SyncLine'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
+import { TouchNotice } from './features/typing/TouchNotice'
 import { characterClass } from './features/typing/characterClass'
 import { useHesitation } from './features/typing/useHesitation'
 import { useKeystrokeCapture } from './features/typing/useKeystrokeCapture'
+import { useTouchOnly } from './features/typing/useTouchOnly'
 import { ThemeToggle } from './features/theme/ThemeToggle'
 
 function newClientSessionId(): string {
@@ -62,6 +64,7 @@ interface NextDrill {
 type Phase = 'loading' | 'ready' | 'scoring' | 'result' | 'error'
 
 function App() {
+  const touchOnly = useTouchOnly()
   const [attempt, setAttempt] = useState(0)
   const [next, setNext] = useState<NextDrill>({})
   const [phase, setPhase] = useState<Phase>('loading')
@@ -246,14 +249,18 @@ function App() {
           />
         ) : null}
         {isTyping && drill ? (
-          <Drill
-            drill={drill}
-            scoring={phase === 'scoring'}
-            onStartOver={drill.resume ? () => void startOver() : undefined}
-            onComplete={() => {
-              void score()
-            }}
-          />
+          touchOnly ? (
+            <TouchNotice />
+          ) : (
+            <Drill
+              drill={drill}
+              scoring={phase === 'scoring'}
+              onStartOver={drill.resume ? () => void startOver() : undefined}
+              onComplete={() => {
+                void score()
+              }}
+            />
+          )
         ) : null}
 
         <footer className="mt-20 text-xs leading-relaxed text-stone-400 dark:text-stone-600">
