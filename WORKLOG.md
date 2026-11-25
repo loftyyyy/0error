@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 199 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 133 tests in 21 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 137 tests in 22 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Recent drills can be filtered by tier. When the window holds more than one tier, quiet buttons offer All plus each tier name; choosing one keeps only its rows, resets the expansion, and recalculates Show N more. A single-tier history stays clean with no controls. An App test seeds two tiers and proves All 3 then Top row 2. |
+| `HEAD`    | Production deployment config. `frontend/vercel.json` pins the Vite build and `dist` output, rewrites app routes to `index.html` while leaving `/assets` alone, sets nosniff, frame denial, referrer and permissions headers, and caches hashed assets for a year. `.env.production.example` and the README document the exact `VITE_API_BASE_URL` and backend `CORS_ALLOWED_ORIGINS`, including the need to add preview domains and to call the API directly so SSE is not buffered. A config test reads the real JSON and the API join behavior. |
+| `a63996a` | Recent drills can be filtered by tier, with All as the default and Show N more recalculated per filter. |
 | `24bedc5` | Client errors emit one `0error:client-error` event from window hooks and the ErrorBoundary; the footer shows the injected build version. |
 | `b8b501f` | A scored result moves focus to its heading; inactive guide labels gain contrast; reduced-motion users get no animation. |
 | `1338c82` | Recent drills says "Loading recent drills..." while fetching and "No finished drills yet." when empty; a failed request still hides the section. |

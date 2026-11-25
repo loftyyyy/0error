@@ -156,6 +156,22 @@ The frontend takes one optional variable, `VITE_API_BASE_URL`. Leave it empty in
 development so the Vite proxy is used; set it when the API lives on another
 origin.
 
+### Deploying the frontend
+
+Vercel uses `frontend/vercel.json`: Vite build, `dist` output, SPA rewrite that
+leaves `/assets` alone, baseline security headers, and immutable caching for
+hashed assets. Set the production API origin in Vercel:
+
+```bash
+VITE_API_BASE_URL=https://api.your-domain.example
+```
+
+Then set the backend `CORS_ALLOWED_ORIGINS` to the exact Vercel domain. CORS uses
+exact origins, so each preview domain needs adding, or use one stable preview
+domain. Call the API directly rather than through a rewrite, so SSE is not
+buffered. Copy `.env.production.example` as a local reminder; never commit real
+keys.
+
 The AI variables name the model, not the vendor. They work with any
 OpenAI-compatible endpoint, and a second provider can sit behind the first:
 
