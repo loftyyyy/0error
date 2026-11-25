@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 199 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 127 tests in 20 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 128 tests in 20 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The coach panel now says exactly "Coach is reading the run" from stream start until the first token. A failed stream keeps its single plain sentence; the section never flickers or stacks messages. An App test holds the SSE response open and asserts the loading line. |
+| `HEAD`    | Accessibility pass. A scored result moves focus to its heading so a screen reader reads the outcome instead of leaving focus on a removed surface. Inactive guide labels move to stronger stone shades, and a global `prefers-reduced-motion` rule removes animation and transition time without changing layout. The existing typing-surface focus and live-region tests still hold. |
+| `c401cd2` | The coach panel says "Coach is reading the run" until the first token; a failed stream keeps one plain sentence. |
 | `1338c82` | Recent drills says "Loading recent drills..." while fetching and "No finished drills yet." when empty; a failed request still hides the section. |
 | `bab3085` | Touch-only devices get a physical-keyboard notice instead of a drill that cannot accept input. |
 | `6245a0d` | An uncaught render crash shows a calm fallback and one reload action; queued keystrokes stay in storage. |

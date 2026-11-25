@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, RotateCcw } from 'lucide-react'
 
 import { fetchDrillSet } from './features/drills/drillApi'
@@ -456,6 +456,14 @@ function ResultPanel({
   onPracticePair: (pair: string) => void
   onPracticeFinger: (finger: string) => void
 }) {
+  const heading = useRef<HTMLHeadingElement | null>(null)
+
+  // A new result is the next thing to read; park focus on its heading instead
+  // of leaving it on the typing surface that just unmounted.
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true })
+  }, [])
+
   // Once nothing above this tier is locked there is no next unlock to promise.
   const nextLocked = progress?.tiers.find(
     (tier) => tier.tier > result.tier && !tier.unlocked,
@@ -464,7 +472,11 @@ function ResultPanel({
   return (
     <div className="rounded-2xl border border-stone-200 px-6 py-8 dark:border-stone-800">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-lg font-medium">
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="text-lg font-medium outline-none"
+        >
           {result.passed ? 'Gate passed.' : 'Not yet.'}
         </h1>
         <span className="text-xs tabular-nums text-stone-400 dark:text-stone-500">

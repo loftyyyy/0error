@@ -809,6 +809,18 @@ describe('App', () => {
     expect(calls.some((call) => call.url.includes('/fingers/trend'))).toBe(false)
   })
 
+  it('moves focus to the scored result', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Gate passed.'), 'the result')
+    const heading = Array.from(container?.querySelectorAll('h1') ?? []).find(
+      (candidate) => candidate.textContent === 'Gate passed.',
+    )
+    expect(heading).toBeDefined()
+    expect(document.activeElement).toBe(heading)
+  })
+
   it('practises the weakest pair on request', async () => {
     focusPairs = [
       {

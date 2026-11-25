@@ -49,7 +49,7 @@ export function KeyboardGuide({
       : 'fill-transparent stroke-stone-300 transition-colors duration-300 dark:stroke-stone-700'
 
   const labelClass = (active: boolean) =>
-    active ? 'fill-stone-50 dark:fill-stone-950' : 'fill-stone-400 dark:fill-stone-500'
+    active ? 'fill-stone-50 dark:fill-stone-950' : 'fill-stone-500 dark:fill-stone-400'
 
   return (
     <div
