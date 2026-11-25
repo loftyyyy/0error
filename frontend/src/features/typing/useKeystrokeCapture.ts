@@ -17,6 +17,9 @@ export interface UseKeystrokeCaptureOptions {
   initialPosition?: number
   initialSeq?: number
   initialElapsedMs?: number
+  initialTyped?: number
+  initialScored?: number
+  initialCorrect?: number
   warmupOnStart?: boolean
   onComplete?: (snapshot: TypingSnapshot) => void
 }
@@ -62,6 +65,9 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
     initialPosition,
     initialSeq,
     initialElapsedMs,
+    initialTyped,
+    initialScored,
+    initialCorrect,
     warmupOnStart,
     onComplete,
   } = options
@@ -75,6 +81,9 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
         initialPosition,
         initialSeq,
         initialElapsedMs,
+        initialTyped,
+        initialScored,
+        initialCorrect,
         warmupOnStart,
       }),
     [
@@ -84,6 +93,9 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
       initialPosition,
       initialSeq,
       initialElapsedMs,
+      initialTyped,
+      initialScored,
+      initialCorrect,
       warmupOnStart,
     ],
   )

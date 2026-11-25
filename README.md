@@ -41,8 +41,9 @@ whatever pair or finger still makes you hesitate.
   starts a fresh attempt with that weakness sent to the server, so the same
   target is exercised without waiting for analysis to surface it again.
 - A reload asks the server for an open drill. When one exists it resumes at the
-  stored cursor and telemetry sequence, with three warmup keys after the break.
-  Earlier rhythm shading is not replayed; the progress bar still shows position.
+  stored cursor, telemetry sequence, key count, and accuracy, with three warmup
+  keys after the break. Earlier rhythm shading is not replayed; the progress bar
+  still shows position.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
   three failed attempts.
@@ -250,7 +251,7 @@ person.
 | POST   | `/api/v1/sessions/{id}/telemetry`      | Append raw keystrokes; `200`, or `409` if all known |
 | POST   | `/api/v1/sessions/{id}/complete`       | Score once; a retry replays the stored answer       |
 | GET    | `/api/v1/sessions/recent?limit=`       | Own completed drills, newest first; 1–20, default 5 |
-| GET    | `/api/v1/sessions/active`              | Open drill for a returning tab, or `204`; includes cursor, `nextSeq`, elapsed |
+| GET    | `/api/v1/sessions/active`              | Open drill for a returning tab, or `204`; cursor, sequence, clock, counts |
 | GET    | `/api/v1/sessions/{id}/feedback`       | SSE coaching: `token` events, then `done` `[DONE]`  |
 | GET    | `/api/v1/progress`                     | Tiers, effective thresholds, unlock timestamps      |
 | GET    | `/api/v1/progress/weak-pairs?tier=`    | Pair aggregates, weakest first                      |

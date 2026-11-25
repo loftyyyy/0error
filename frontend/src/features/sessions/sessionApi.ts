@@ -127,6 +127,9 @@ export interface ActiveSession {
   keystrokes: number
   position: number
   elapsedMs: number
+  typedCount: number
+  scoredCount: number
+  correctCount: number
 }
 
 function isCount(value: unknown): value is number {
@@ -161,7 +164,12 @@ export async function fetchActiveSession(): Promise<ActiveSession | null> {
     !isCount(body.keystrokes) ||
     !isCount(body.position) ||
     body.position > body.text.length ||
-    !isCount(body.elapsedMs)
+    !isCount(body.elapsedMs) ||
+    !isCount(body.typedCount) ||
+    !isCount(body.scoredCount) ||
+    !isCount(body.correctCount) ||
+    body.correctCount > body.scoredCount ||
+    body.scoredCount > body.typedCount
   ) {
     throw new Error('The resume response was invalid')
   }

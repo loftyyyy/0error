@@ -59,6 +59,12 @@ export interface TypingEngineOptions {
   initialSeq?: number
   /** Active time already spent before the reload. */
   initialElapsedMs?: number
+  /** Typed keys already stored, for the resume display. */
+  initialTyped?: number
+  /** Distinct scored positions already stored. */
+  initialScored?: number
+  /** Correct first attempts already stored. */
+  initialCorrect?: number
   /** The first keys after a reload are warmup. */
   warmupOnStart?: boolean
 }
@@ -122,6 +128,16 @@ export class TypingEngine {
     this.targetShownAt = elapsed
     this.warmupRemaining = options.warmupOnStart ? WARMUP_KEYSTROKES : 0
     this.status = restoredPosition >= text.length ? 'complete' : 'running'
+    this.typed = Math.max(0, options.initialTyped ?? 0)
+    this.scoredTotal = Math.max(0, options.initialScored ?? 0)
+    this.scoredCorrect = Math.min(
+      this.scoredTotal,
+      Math.max(0, options.initialCorrect ?? 0),
+    )
+    this.errors = this.scoredTotal - this.scoredCorrect
+    for (let index = 0; index < restoredPosition; index += 1) {
+      this.scoredPositions.add(index)
+    }
     this.quality = new Array(text.length).fill(null)
   }
 

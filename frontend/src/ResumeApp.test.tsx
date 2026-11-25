@@ -25,6 +25,9 @@ const active: ActiveSession = {
   keystrokes: 5,
   position: 3,
   elapsedMs: 1200,
+  typedCount: 3,
+  scoredCount: 3,
+  correctCount: 2,
 }
 
 const progress = {
@@ -183,6 +186,8 @@ describe('resume after reload', () => {
     await waitFor(() => shownText() === TEXT, 'the resumed drill text')
 
     expect(bodyText()).toContain('Picked up where you left off.')
+    expect(bodyText()).toContain('67% accurate')
+    expect(bodyText()).toContain('3 keys')
     expect(calls.some((call) => call.url.includes('/drills/next'))).toBe(false)
     expect(
       calls.some((call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST'),

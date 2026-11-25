@@ -42,6 +42,9 @@ interface ActiveDrill {
     position: number
     seq: number
     elapsedMs: number
+    typed: number
+    scored: number
+    correct: number
   }
 }
 
@@ -92,6 +95,9 @@ function App() {
               position: active.position,
               seq: active.nextSeq,
               elapsedMs: active.elapsedMs,
+              typed: active.typedCount,
+              scored: active.scoredCount,
+              correct: active.correctCount,
             },
           })
           setPhase('ready')
@@ -309,6 +315,9 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
     initialPosition: drill.resume?.position,
     initialSeq: drill.resume?.seq,
     initialElapsedMs: drill.resume?.elapsedMs,
+    initialTyped: drill.resume?.typed,
+    initialScored: drill.resume?.scored,
+    initialCorrect: drill.resume?.correct,
     warmupOnStart: Boolean(drill.resume),
   })
 

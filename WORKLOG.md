@@ -9,9 +9,9 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  197 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 193 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 113 tests in 18 files, oxlint clean,
+  198 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 194 pass, including the Postgres-backed acceptance tests.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 115 tests in 18 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The drill now says when keys are waiting locally. `telemetryBuffer` exposes `synced`, `pending`, and `offline`; a network failure marks offline, a retryable server answer marks pending, and an empty queue returns to synced. `SyncLine` renders that state under the drill as a quiet live line and disappears when acknowledged. Tests drive the real queue: a thrown fetch reports offline, a `503` reports pending, a `409` returns to synced, and a rendered `SyncLine` proves both sentences appear and clear. Frontend 113 tests. |
+| `HEAD`    | A resumed drill now shows the same key count and accuracy the server will score. `GET /sessions/active` adds `typedCount`, `scoredCount`, and `correctCount`, derived from non-warmup KEY events and the first attempt per position. The engine seeds typed, scored, correct, and the set of already-scored positions, so backspacing into restored text cannot count it twice. The App test now asserts "67% accurate" and "3 keys" on a resumed drill. Frontend 115 tests, backend 198. |
+| `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts, so resume metrics match server scoring. |
+| `8f01e0b` | The drill shows one quiet line while keys wait locally: offline when the network fails, pending when the server asks for a retry. It clears when acknowledged. |
 | `bd56a3e` | A reload resumes the open drill. `GET /sessions/active` returns cursor, sequence, and active clock; the engine restores all three, marks three warmup keys, and the status says "Picked up where you left off." |
 | `4161611` | `GET /sessions/active` returns the cursor position and active time beside `nextSeq`, derived from the last stored keystroke. |
 | `3b2967c` | The focus and reach notes offer "Practise dk" and "Practise Left ring". Each starts a three-drill attempt with `focus=` or `finger=` on every request. |
@@ -92,11 +94,12 @@ commit `HEAD`; older rows keep their real hashes.
   automatically focused drill.
 - **Resume returns a sequence and a cursor, not a replay.** `GET /sessions/active`
   answers `204` or the newest ACTIVE session with `nextSeq` one past the highest
-  stored keystroke, `position` derived from the last KEY or BACKSPACE, and the
-  active clock. A reloaded tab appends instead of colliding and starts at the
-  stored index. Earlier rhythm shading is not rebuilt; the progress bar carries
-  the position. Only the owner sees it; completed attempts and other guests are
-  invisible.
+  stored keystroke, `position` derived from the last KEY or BACKSPACE, the active
+  clock, and the stored typed/scored/correct counts. A reloaded tab appends
+  instead of colliding, starts at the stored index, and keeps the accuracy the
+  server will score. Earlier rhythm shading is not rebuilt; the progress bar
+  carries the position. Only the owner sees it; completed attempts and other
+  guests are invisible.
 - **Backfill is repair, not recomputation.** The daily job rebuilds per-session
   trend rows only where they are missing and raw keystrokes still exist. It never
   merges the rolling aggregates again, because those already counted the session;

@@ -273,6 +273,9 @@ describe('fetchActiveSession', () => {
     keystrokes: 7,
     position: 5,
     elapsedMs: 4200,
+    typedCount: 6,
+    scoredCount: 5,
+    correctCount: 4,
   }
 
   beforeEach(() => {
@@ -311,6 +314,17 @@ describe('fetchActiveSession', () => {
       'fetch',
       vi.fn(async () => jsonResponse({ ...active, position: 'five' })),
     )
+
+    const { fetchActiveSession } = await import('./sessionApi')
+
+    await expect(fetchActiveSession()).rejects.toThrow(
+      'The resume response was invalid',
+    )
+  })
+
+  it('rejects a resume body without stored attempt counts', async () => {
+    const { typedCount: _typed, ...missing } = active
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(missing)))
 
     const { fetchActiveSession } = await import('./sessionApi')
 

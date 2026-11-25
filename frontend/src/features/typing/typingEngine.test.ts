@@ -66,6 +66,34 @@ describe('TypingEngine', () => {
     })
   })
 
+  it('seeds the displayed accuracy and key count from stored attempts', () => {
+    const engine = new TypingEngine('asdf', {
+      initialPosition: 2,
+      initialSeq: 3,
+      initialTyped: 3,
+      initialScored: 2,
+      initialCorrect: 1,
+    })
+
+    expect(engine.getSnapshot()).toMatchObject({
+      index: 2,
+      typed: 3,
+      errors: 1,
+      accuracy: 0.5,
+    })
+
+    // Backspacing into already-seeded text never counts that position twice.
+    engine.press('Backspace', 100)
+    engine.press('s', 200)
+    engine.press('d', 300)
+
+    expect(engine.getSnapshot()).toMatchObject({
+      typed: 5,
+      errors: 1,
+      accuracy: 2 / 3,
+    })
+  })
+
   it('rejects a stored cursor outside the drill', () => {
     const engine = new TypingEngine('as', {
       initialPosition: 9,
