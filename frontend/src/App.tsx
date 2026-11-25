@@ -645,6 +645,7 @@ function RecentDrills({ tier }: { tier: number }) {
   const [sessions, setSessions] = useState<RecentSession[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [filter, setFilter] = useState<number | 'all'>('all')
 
   useEffect(() => {
     let active = true
@@ -680,9 +681,20 @@ function RecentDrills({ tier }: { tier: number }) {
     )
   }
 
-  const visible = expanded ? sessions : sessions.slice(0, HISTORY_VISIBLE)
-  const hidden = sessions.length - visible.length
+  const tiers = Array.from(
+    new Map(sessions.map((entry) => [entry.tier, entry.tierName])).entries(),
+  )
+  const filtered =
+    filter === 'all' ? sessions : sessions.filter((entry) => entry.tier === filter)
+  const visible = expanded ? filtered : filtered.slice(0, HISTORY_VISIBLE)
+  const hidden = filtered.length - visible.length
   const trend = tierTrend(sessions, tier)
+
+  const choose = (next: number | 'all') => {
+    setFilter(next)
+    setExpanded(false)
+  }
+  const filters: Array<number | 'all'> = ['all', ...tiers.map(([value]) => value)]
 
   return (
     <div className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
@@ -693,6 +705,32 @@ function RecentDrills({ tier }: { tier: number }) {
         <summary className="cursor-pointer text-[0.65rem] font-medium tracking-[0.2em] text-stone-400 uppercase dark:text-stone-500">
           Recent drills
         </summary>
+        {tiers.length > 1 ? (
+          <div className="mt-3 flex flex-wrap gap-3 text-xs" aria-label="Filter recent drills">
+            {filters.map((value) => {
+              const selected = filter === value
+              const label =
+                value === 'all'
+                  ? 'All'
+                  : tiers.find(([candidate]) => candidate === value)?.[1] ?? 'Tier'
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => choose(value)}
+                  className={
+                    selected
+                      ? 'text-stone-600 dark:text-stone-300'
+                      : 'text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300'
+                  }
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
         <ul className="mt-3 space-y-1.5 text-xs tabular-nums">
           {visible.map((entry) => (
             <li key={entry.sessionId} className="flex items-baseline justify-between gap-4">

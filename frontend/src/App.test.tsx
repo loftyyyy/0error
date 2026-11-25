@@ -927,6 +927,32 @@ describe('App', () => {
     expect(bodyText()).not.toContain('Loading recent drills')
   })
 
+  it('filters recent drills to one tier', async () => {
+    recentResponse = [
+      { ...recent[0], sessionId: 'home-1', tier: 0, tierName: 'Home row' },
+      { ...recent[0], sessionId: 'top-1', tier: 1, tierName: 'Top row' },
+      { ...recent[0], sessionId: 'top-2', tier: 1, tierName: 'Top row' },
+    ]
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Recent drills'), 'the history list')
+    const rows = () => container?.querySelectorAll('details li') ?? []
+    expect(rows()).toHaveLength(3)
+
+    const filter = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'Top row',
+    )
+    expect(filter).toBeDefined()
+    await act(async () => {
+      filter?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(rows()).toHaveLength(2)
+    expect(bodyText()).toContain('All')
+  })
+
   it('still shows the score when the history request fails', async () => {
     recentFailure = 500
 
