@@ -65,6 +65,37 @@ class SessionResumeIntegrationTest {
 			assertThat(active.text()).isEqualTo("asdf jkl; asdf jkl;");
 			assertThat(active.nextSeq()).isEqualTo(3);
 			assertThat(active.keystrokes()).isEqualTo(3);
+			assertThat(active.position()).isEqualTo(3);
+			assertThat(active.elapsedMs()).isEqualTo(900);
+		}
+		finally {
+			deleteUser(guest.guestId());
+		}
+	}
+
+	@Test
+	void aTrailingBackspaceLeavesTheCursorAtThatIndex() {
+		GuestTokenResponse guest = guest();
+		UUID sessionId = UUID.randomUUID();
+		insertActive(guest.guestId(), sessionId);
+
+		try {
+			insertEvent(sessionId, 0, 0, "KEY");
+			insertEvent(sessionId, 1, 1, "KEY");
+			insertEvent(sessionId, 2, 1, "BACKSPACE");
+
+			ActiveSessionResponse active = client.get()
+					.uri("/api/v1/sessions/active")
+					.headers(headers -> headers.setBearerAuth(guest.token()))
+					.exchange()
+					.expectStatus().isOk()
+					.expectBody(ActiveSessionResponse.class)
+					.returnResult()
+					.getResponseBody();
+
+			assertThat(active).isNotNull();
+			assertThat(active.position()).isEqualTo(1);
+			assertThat(active.nextSeq()).isEqualTo(3);
 		}
 		finally {
 			deleteUser(guest.guestId());
@@ -90,6 +121,8 @@ class SessionResumeIntegrationTest {
 			assertThat(active).isNotNull();
 			assertThat(active.nextSeq()).isZero();
 			assertThat(active.keystrokes()).isZero();
+			assertThat(active.position()).isZero();
+			assertThat(active.elapsedMs()).isZero();
 		}
 		finally {
 			deleteUser(guest.guestId());
@@ -190,20 +223,26 @@ class SessionResumeIntegrationTest {
 	}
 
 	private void insertEvent(UUID sessionId, int seq) {
-		databaseClient.sql("""
+		insertEvent(sessionId, seq, seq, "KEY");
+	}
+
+	private void insertEvent(UUID sessionId, int seq, int position, String kind) {
+		var spec = databaseClient.sql("""
 						INSERT INTO keystroke_events (session_id, seq, position, kind, expected_char,
 						                              actual_char, is_correct, t_ms, display_ms,
 						                              is_warmup)
-						VALUES (:sessionId, :seq, :position, 'KEY', 'a', 'a', true,
+						VALUES (:sessionId, :seq, :position, :kind, 'a', :actual, true,
 						        :t, 100, false)
 						""")
 				.bind("sessionId", sessionId)
 				.bind("seq", seq)
-				.bind("position", seq)
-				.bind("t", (seq + 1) * 300)
-				.fetch()
-				.rowsUpdated()
-				.block();
+				.bind("position", position)
+				.bind("kind", kind)
+				.bind("t", (seq + 1) * 300);
+		spec = "BACKSPACE".equals(kind)
+				? spec.bindNull("actual", String.class)
+				: spec.bind("actual", "a");
+		spec.fetch().rowsUpdated().block();
 	}
 
 	private void deleteUser(UUID userId) {

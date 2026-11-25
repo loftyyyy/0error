@@ -20,7 +20,19 @@ public class SessionResumeService {
 
 	private static final String SEQUENCE = """
 			SELECT COALESCE(MAX(seq) + 1, 0) AS next_seq,
-			       COUNT(*) AS total
+			       COUNT(*) AS total,
+			       COALESCE((
+			           SELECT position FROM keystroke_events
+			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
+			       ), 0) AS last_position,
+			       COALESCE((
+			           SELECT kind FROM keystroke_events
+			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
+			       ), 'KEY') AS last_kind,
+			       COALESCE((
+			           SELECT t_ms FROM keystroke_events
+			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
+			       ), 0) AS last_t
 			FROM keystroke_events
 			WHERE session_id = :sessionId
 			""";
@@ -49,19 +61,31 @@ public class SessionResumeService {
 								session.allowedCharset(),
 								session.startedAt(),
 								position.nextSeq(),
-								position.total()))))
+								position.total(),
+								position.cursor(),
+								position.elapsedMs()))))
 				.defaultIfEmpty(Optional.empty());
 	}
 
 	private Mono<Sequence> sequence(UUID sessionId) {
 		return databaseClient.sql(SEQUENCE)
 				.bind("sessionId", sessionId)
-				.map((row, metadata) -> new Sequence(
-						row.get("next_seq", Integer.class),
-						row.get("total", Long.class)))
+				.map((row, metadata) -> {
+					long total = row.get("total", Long.class);
+					int lastPosition = row.get("last_position", Integer.class);
+					String lastKind = row.get("last_kind", String.class);
+					int cursor = total == 0
+							? 0
+							: ("KEY".equals(lastKind) ? lastPosition + 1 : lastPosition);
+					return new Sequence(
+							row.get("next_seq", Integer.class),
+							total,
+							cursor,
+							row.get("last_t", Integer.class));
+				})
 				.one();
 	}
 
-	private record Sequence(int nextSeq, long total) {
+	private record Sequence(int nextSeq, long total, int cursor, long elapsedMs) {
 	}
 }
