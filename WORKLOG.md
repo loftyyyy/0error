@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 199 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 119 tests in 18 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 121 tests in 19 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Real browser E2E is configured with Playwright. Two Chromium specs drive the built app against the real backend and Postgres: one completes a full drill through the gate and history, one types part of a drill, waits for telemetry, reloads, proves the resume notice and text, then clicks Start over and proves the abandon request and a fresh drill. The config starts Vite and `mvnw spring-boot:run` with AI disabled, uses one worker, and keeps traces on failure. `npm run test:e2e` runs it; reports are ignored by Git. |
+| `HEAD`    | An uncaught render crash now shows a calm fallback instead of a blank page. `ErrorBoundary` wraps the app, states that progress is safe, and offers one reload action. Tests render a component that throws and prove the fallback and the reload callback. |
+| `9a5d29d` | Playwright drives Chromium through a full drill and through reload resume plus Start over. The config starts Vite and Spring Boot with AI disabled. |
 | `b9def9d` | An open drill can be abandoned. `POST /sessions/{id}/abandon` closes only the owner's ACTIVE row with an honest end time; resume stops offering it. A quiet "Start over" closes it and loads a fresh attempt. |
 | `db67008` | Resume keeps the stored key count and accuracy; the engine seeds scored positions and never double counts restored text. |
 | `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts. |
