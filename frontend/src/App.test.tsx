@@ -163,6 +163,9 @@ let recentResponse: RecentSession[] = recent
 /** When set, the history request fails with this status. */
 let recentFailure: number | null = null
 
+/** When true, the history request never settles, for the loading state. */
+let recentPending = false
+
 /** An open drill the server reports on load, or null for a fresh start. */
 let activeSession: ActiveSession | null = null
 
@@ -254,6 +257,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     return json(activeSession)
   }
   if (url.includes('/api/v1/sessions/recent')) {
+    if (recentPending) return new Promise<Response>(() => undefined)
     if (recentFailure !== null) return json({ error: 'temporarily unavailable' }, recentFailure)
     return json({ sessions: recentResponse })
   }
@@ -308,6 +312,7 @@ beforeEach(async () => {
   progressResponse = progress
   recentResponse = recent
   recentFailure = null
+  recentPending = false
   activeSession = null
   focusPairs = []
   focusTrend = null
@@ -866,6 +871,31 @@ describe('App', () => {
     )
     expect(focused).toHaveLength(3)
     expect(focused.every((call) => !call.url.includes('focus='))).toBe(true)
+  })
+
+  it('says when the history is still loading', async () => {
+    recentPending = true
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('Loading recent drills'),
+      'the history loading line',
+    )
+  })
+
+  it('says when no finished drills exist yet', async () => {
+    recentResponse = []
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('No finished drills yet.'),
+      'the empty history line',
+    )
+    expect(bodyText()).not.toContain('Loading recent drills')
   })
 
   it('still shows the score when the history request fails', async () => {

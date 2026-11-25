@@ -54,8 +54,9 @@ whatever pair or finger still makes you hesitate.
   needs 450 ms or less." The list is not raw diagnostics in monospace.
 - A collapsed "Recent drills" list under the result shows the guest's five most
   recent finished drills with the date, accuracy, median, and whether each
-  cleared its gate. Up to twenty are one click away. It is optional context: if
-  the history request fails, the panel is unchanged.
+  cleared its gate. Up to twenty are one click away. While it loads, one quiet
+  line says so; with no finished drills it says "No finished drills yet." It is
+  optional context: if the history request fails, the panel is unchanged.
 - Above that list, a single line reads the practised tier's direction across the
   most recent five attempts at it: "Home row over your last 4 drills: accuracy
   91.2% → 97.5% · median 610 ms → 380 ms." It compares the server's own numbers

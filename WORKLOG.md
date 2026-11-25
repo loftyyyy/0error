@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 199 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 124 tests in 20 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 126 tests in 20 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,9 +22,10 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Touch-only devices no longer get a dead drill. `useTouchOnly` treats a coarse pointer with no fine pointer as keyboard-less, and `TouchNotice` replaces the drill with one calm message asking for a laptop or desktop. Mouse, trackpad, and hybrid devices still type. Tests cover both pointer shapes and the rendered notice. |
+| `HEAD`    | Recent drills now states its own state. While the request is open it says "Loading recent drills..."; with no completed rows it says "No finished drills yet." A failed request still hides the section entirely, so an outage adds no clutter. Tests cover the loading line and the empty line after a completed drill. |
+| `bab3085` | Touch-only devices get a physical-keyboard notice instead of a drill that cannot accept input. |
 | `6245a0d` | An uncaught render crash shows a calm fallback and one reload action; queued keystrokes stay in storage. |
-| `9a5d29d` | Playwright drives Chromium through a full drill and through reload resume plus Start over. |
+| `9a5d29d` | Playwright drives Chromium through a full drill and through reload resume plus Start over. The config starts Vite and Spring Boot with AI disabled. |
 | `b9def9d` | An open drill can be abandoned. `POST /sessions/{id}/abandon` closes only the owner's ACTIVE row with an honest end time; resume stops offering it. A quiet "Start over" closes it and loads a fresh attempt. |
 | `db67008` | Resume keeps the stored key count and accuracy; the engine seeds scored positions and never double counts restored text. |
 | `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts. |

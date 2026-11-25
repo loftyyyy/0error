@@ -629,6 +629,7 @@ const HISTORY_LIMIT = 20
 
 function RecentDrills({ tier }: { tier: number }) {
   const [sessions, setSessions] = useState<RecentSession[] | null>(null)
+  const [failed, setFailed] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -639,7 +640,7 @@ function RecentDrills({ tier }: { tier: number }) {
         if (active) setSessions(entries)
       })
       .catch(() => {
-        if (active) setSessions([])
+        if (active) setFailed(true)
       })
 
     return () => {
@@ -647,7 +648,23 @@ function RecentDrills({ tier }: { tier: number }) {
     }
   }, [])
 
-  if (!sessions || sessions.length === 0) return null
+  if (failed) return null
+
+  if (sessions === null) {
+    return (
+      <p className="mt-6 text-xs text-stone-400 dark:text-stone-500">
+        Loading recent drills&hellip;
+      </p>
+    )
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <p className="mt-6 text-xs text-stone-400 dark:text-stone-500">
+        No finished drills yet.
+      </p>
+    )
+  }
 
   const visible = expanded ? sessions : sessions.slice(0, HISTORY_VISIBLE)
   const hidden = sessions.length - visible.length
