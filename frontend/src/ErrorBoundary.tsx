@@ -1,6 +1,8 @@
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 
+import { reportClientError } from './lib/observability'
+
 interface ErrorBoundaryProps {
   children: ReactNode
   /** Overridable so the fallback can be tested without a real navigation. */
@@ -24,6 +26,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    reportClientError(error, 'render')
     console.error('0Error render failed', error, info.componentStack)
   }
 

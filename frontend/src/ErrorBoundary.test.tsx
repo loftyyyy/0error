@@ -7,6 +7,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ErrorBoundary } from './ErrorBoundary'
+import { CLIENT_ERROR_EVENT } from './lib/observability'
 
 const env = globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }
 env.IS_REACT_ACT_ENVIRONMENT = true
@@ -70,5 +71,22 @@ describe('ErrorBoundary', () => {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the crash through the client error event', () => {
+    const seen: string[] = []
+    window.addEventListener(CLIENT_ERROR_EVENT, (event) => {
+      seen.push((event as CustomEvent<{ kind: string }>).detail.kind)
+    })
+
+    act(() => {
+      root!.render(
+        <ErrorBoundary onReload={() => undefined}>
+          <Boom />
+        </ErrorBoundary>,
+      )
+    })
+
+    expect(seen).toContain('render')
   })
 })

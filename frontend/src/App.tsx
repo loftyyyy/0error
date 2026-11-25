@@ -18,6 +18,7 @@ import {
 import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
 import { SyncLine } from './features/telemetry/SyncLine'
+import { APP_VERSION } from './lib/observability'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
 import { TouchNotice } from './features/typing/TouchNotice'
 import { characterClass } from './features/typing/characterClass'
@@ -267,6 +268,7 @@ function App() {
           Clean keys fade; a warm letter marks a pause. Telemetry queues locally until the API
           acknowledges it. Focus loss pauses the clock. Three keystrokes after a pause are warmup
           and never scored.
+          <span className="ml-2 text-stone-300 dark:text-stone-700">v{APP_VERSION}</span>
         </footer>
       </div>
     </main>

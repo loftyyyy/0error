@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './ErrorBoundary.tsx'
+import { installClientErrorReporting } from './lib/observability.ts'
+
+installClientErrorReporting()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
