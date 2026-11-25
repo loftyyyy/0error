@@ -364,6 +364,7 @@ function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
       </p>
       <p
         aria-hidden="true"
+        data-testid="drill-text"
         className="font-mono text-3xl leading-[1.9] tracking-wide break-words select-none sm:text-4xl"
       >
         {drill.text.split('').map((character, index) => {
@@ -506,8 +507,8 @@ function ResultPanel({
       {progress ? <TierLadder progress={progress} currentTier={result.tier} /> : null}
 
       <CoachNote sessionId={drill.sessionId} />
-      <FocusNote key={result.tier} tier={result.tier} onPractice={onPracticePair} />
-      <FingerNote key={result.tier} tier={result.tier} onPractice={onPracticeFinger} />
+      <FocusNote key={`focus-${result.tier}`} tier={result.tier} onPractice={onPracticePair} />
+      <FingerNote key={`finger-${result.tier}`} tier={result.tier} onPractice={onPracticeFinger} />
       <RecentDrills tier={result.tier} />
 
       <button

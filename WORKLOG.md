@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | An open drill can be abandoned. `POST /sessions/{id}/abandon` closes only the owner's ACTIVE row, sets an honest `ended_at`, answers `204`, `404` for a foreign or missing drill, and `409` for one already completed. The resume card offers a quiet "Start over": it closes the session, then loads a fresh three-drill attempt, so reload no longer brings the old one back. Tests: HTTP abandon, resume stops offering it, foreign drill untouched, completed drill conflicts, unauthenticated rejection, API idempotence on `404`/`409`, and an App test proving abandon then a fresh drill set. Backend 203, frontend 119. |
+| `HEAD`    | Real browser E2E is configured with Playwright. Two Chromium specs drive the built app against the real backend and Postgres: one completes a full drill through the gate and history, one types part of a drill, waits for telemetry, reloads, proves the resume notice and text, then clicks Start over and proves the abandon request and a fresh drill. The config starts Vite and `mvnw spring-boot:run` with AI disabled, uses one worker, and keeps traces on failure. `npm run test:e2e` runs it; reports are ignored by Git. |
+| `b9def9d` | An open drill can be abandoned. `POST /sessions/{id}/abandon` closes only the owner's ACTIVE row with an honest end time; resume stops offering it. A quiet "Start over" closes it and loads a fresh attempt. |
 | `db67008` | Resume keeps the stored key count and accuracy; the engine seeds scored positions and never double counts restored text. |
 | `a641775` | `GET /sessions/active` returns typed, scored, and correct counts derived from stored attempts. |
 | `8f01e0b` | The drill shows one quiet line while keys wait locally: offline when the network fails, pending when the server asks for a retry. It clears when acknowledged. |

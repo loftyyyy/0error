@@ -75,7 +75,7 @@ export function KeyboardGuide({
               const y = rowIndex * ROW_STEP
               const active = highlight?.base === base
               return (
-                <g key={base}>
+                <g key={`${rowIndex}-${index}-${base}`}>
                   <rect
                     x={x}
                     y={y}

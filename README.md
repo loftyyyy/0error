@@ -303,7 +303,12 @@ cd frontend
 npm run lint
 npm test
 npm run build
+npm run test:e2e   # Playwright; starts Vite and the backend
 ```
+
+Playwright uses Chromium and expects the Postgres from `compose.yaml` on port
+55432. Its web server entries start Vite and `mvnw spring-boot:run` with AI
+disabled. The specs cover one full drill, reload resume, and "Start over".
 
 Most frontend tests are pure functions rendered to static markup. The `App` flow
 tests, the keystroke capture test, and the hesitation test run in jsdom and
