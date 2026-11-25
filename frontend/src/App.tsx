@@ -16,6 +16,7 @@ import {
 } from './features/sessions/sessionApi'
 import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
 import { flushSession } from './features/telemetry/telemetryBuffer'
+import { SyncLine } from './features/telemetry/SyncLine'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
 import { characterClass } from './features/typing/characterClass'
 import { useHesitation } from './features/typing/useHesitation'
@@ -390,6 +391,8 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
       <div className="mt-2 h-5 text-xs text-stone-400 dark:text-stone-500" aria-live="polite">
         {notice === 'paste-blocked' ? 'Paste is off. Type it out.' : null}
       </div>
+
+      <SyncLine />
 
       <KeyboardGuide
         character={drill.text[snapshot.index] ?? null}

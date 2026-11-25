@@ -24,7 +24,30 @@ function newBatchId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-type PostResult = 'ok' | 'retry' | 'drop'
+type PostResult = 'ok' | 'retry' | 'offline' | 'drop'
+
+/** How much of the keystroke queue has reached the server. */
+export type SyncState = 'synced' | 'pending' | 'offline'
+
+let syncState: SyncState = 'synced'
+const syncListeners = new Set<() => void>()
+
+export function subscribeToSync(listener: () => void): () => void {
+  syncListeners.add(listener)
+  return () => {
+    syncListeners.delete(listener)
+  }
+}
+
+export function getSyncState(): SyncState {
+  return syncState
+}
+
+function setSyncState(next: SyncState): void {
+  if (next === syncState) return
+  syncState = next
+  for (const listener of syncListeners) listener()
+}
 
 async function postBatch(batch: KeystrokeBatch, apiBase: string): Promise<PostResult> {
   const token = readGuestToken()
@@ -52,7 +75,7 @@ async function postBatch(batch: KeystrokeBatch, apiBase: string): Promise<PostRe
       },
     )
   } catch {
-    return 'retry'
+    return 'offline'
   }
 
   if (response.ok || response.status === 409) return 'ok'
@@ -74,16 +97,31 @@ export function drainOutbox(apiBase = API_BASE): Promise<void> {
     try {
       for (let sent = 0; sent < MAX_BATCHES_PER_DRAIN; sent += 1) {
         const batch = await readOldestBatch()
-        if (!batch || batch.id === undefined) return
+        if (!batch || batch.id === undefined) {
+          setSyncState('synced')
+          return
+        }
 
         const result = await postBatch(batch, apiBase)
+        if (result === 'offline') {
+          await markBatchAttempt(batch.id)
+          setSyncState('offline')
+          return
+        }
         if (result === 'retry') {
           await markBatchAttempt(batch.id)
+          setSyncState(
+            typeof navigator !== 'undefined' && navigator.onLine === false
+              ? 'offline'
+              : 'pending',
+          )
           return
         }
 
         await deleteBatch(batch.id)
       }
+      // The queue may still hold work after one bounded drain.
+      setSyncState('pending')
     } finally {
       activeDrain = null
     }

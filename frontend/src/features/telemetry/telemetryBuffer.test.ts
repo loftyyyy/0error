@@ -16,6 +16,85 @@ const events: KeystrokeEvent[] = [
   },
 ]
 
+describe('sync state', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('reports offline when the batch cannot reach the network, then synced', async () => {
+    const failing = vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    })
+    vi.stubGlobal('fetch', failing)
+
+    const { enqueueBatch } = await import('./keystrokeQueue')
+    const {
+      drainOutbox,
+      getSyncState,
+      subscribeToSync,
+    } = await import('./telemetryBuffer')
+    const listener = vi.fn()
+    const unsubscribe = subscribeToSync(listener)
+
+    await enqueueBatch({
+      batchId: 'batch-offline',
+      sessionId: 'session-offline',
+      createdAt: 1,
+      events,
+    })
+    await drainOutbox('')
+
+    expect(getSyncState()).toBe('offline')
+    expect(listener).toHaveBeenCalled()
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
+    await drainOutbox('')
+
+    expect(getSyncState()).toBe('synced')
+    unsubscribe()
+  })
+
+  it('reports pending when the server asks for a retry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 503 })),
+    )
+
+    const { enqueueBatch } = await import('./keystrokeQueue')
+    const { drainOutbox, getSyncState } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-pending',
+      sessionId: 'session-pending',
+      createdAt: 1,
+      events,
+    })
+    await drainOutbox('')
+
+    expect(getSyncState()).toBe('pending')
+  })
+
+  it('returns to synced when a closed session batch is dropped', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 409 })),
+    )
+
+    const { enqueueBatch } = await import('./keystrokeQueue')
+    const { drainOutbox, getSyncState } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-closed',
+      sessionId: 'session-closed',
+      createdAt: 1,
+      events,
+    })
+    await drainOutbox('')
+
+    expect(getSyncState()).toBe('synced')
+  })
+})
+
 describe('flushSession', () => {
   beforeEach(() => {
     vi.resetModules()

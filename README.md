@@ -58,6 +58,9 @@ whatever pair or finger still makes you hesitate.
   and draws no chart.
 - If the keystrokes cannot all reach the server, no result is invented. The
   batches stay in the outbox and "Try again" rescores once the API answers.
+- While keys wait in the outbox, one quiet line says so: "Offline. Your keys are
+  saved on this device." or "Keys are saved here. Sending when the server
+  answers." It disappears once everything is acknowledged.
 - A drill the server has already closed — swept as abandoned while a tab slept,
   completed before answers were stored, or owned by a guest identity this
   browser no longer holds — is not retried forever. The panel says the attempt

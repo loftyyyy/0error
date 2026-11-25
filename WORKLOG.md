@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   197 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 193 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 108 tests in 17 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 113 tests in 18 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | A reload now resumes the open drill instead of starting fresh. `GET /sessions/active` gained `position` and `elapsedMs`: a KEY advances the cursor, a BACKSPACE leaves it at the corrected index, and an empty session starts at zero. The browser asks for the active drill before creating one, restores the cursor, next sequence, and active clock, and marks the next three keys warmup. The status line says "Picked up where you left off." A failed resume check falls back to a fresh drill. Tests: backend covers three keys, a trailing backspace, and an untouched drill; the engine covers restored cursor, sequence, clock, and warmup; `fetchActiveSession` covers body, `204`, malformed, and failure; a dedicated App test proves no drill or session is created and the completion uses the stored sequence. Frontend 108 tests, backend 197. |
+| `HEAD`    | The drill now says when keys are waiting locally. `telemetryBuffer` exposes `synced`, `pending`, and `offline`; a network failure marks offline, a retryable server answer marks pending, and an empty queue returns to synced. `SyncLine` renders that state under the drill as a quiet live line and disappears when acknowledged. Tests drive the real queue: a thrown fetch reports offline, a `503` reports pending, a `409` returns to synced, and a rendered `SyncLine` proves both sentences appear and clear. Frontend 113 tests. |
+| `bd56a3e` | A reload resumes the open drill. `GET /sessions/active` returns cursor, sequence, and active clock; the engine restores all three, marks three warmup keys, and the status says "Picked up where you left off." |
 | `4161611` | `GET /sessions/active` returns the cursor position and active time beside `nextSeq`, derived from the last stored keystroke. |
 | `3b2967c` | The focus and reach notes offer "Practise dk" and "Practise Left ring". Each starts a three-drill attempt with `focus=` or `finger=` on every request. |
 | `752a93c` | Compose now works with Postgres 18: the volume mounts `/var/lib/postgresql`, host port is `${POSTGRES_PORT:-5432}`, and the duplicate `docker-compose.yml` is gone. Healthy container on 55432, PostgreSQL 18.7, V1 to V10 from empty, full backend suite green. |
@@ -116,6 +117,10 @@ commit `HEAD`; older rows keep their real hashes.
   session leaves `ACTIVE`, which keeps stored aggregates identical to the ones
   the gate judged. A `409` on a telemetry batch means "done", not "retry", so
   the outbox drops it.
+- **A waiting queue is visible, not silent.** The drill shows one quiet line when
+  keys are held locally: offline when the network fails, pending when the server
+  asks for a retry. It disappears on the next acknowledged batch. The state is
+  presentation only; it never changes scoring or the outbox rules.
 - **A first load needs the server.** Drills are issued and sessions are created
   server-side, so there is nothing honest to practise offline. The client says
   the server is unreachable in plain words; the outbox still protects a drill
