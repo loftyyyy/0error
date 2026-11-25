@@ -220,6 +220,9 @@ let completionFailure: number | null = null
 /** When true, the coaching stream is unavailable. */
 let feedbackFailure = false
 
+/** When true, the coaching stream never sends a token. */
+let feedbackPending = false
+
 function record(input: RequestInfo | URL, init?: RequestInit) {
   calls.push({
     url: String(input),
@@ -266,6 +269,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     return json(completionResponse)
   }
   if (url.includes('/feedback')) {
+    if (feedbackPending) return new Promise<Response>(() => undefined)
     if (feedbackFailure) return json({ error: 'temporarily unavailable' }, 503)
     return eventStream(FEEDBACK)
   }
@@ -308,6 +312,7 @@ beforeEach(async () => {
   telemetryFailure = null
   completionFailure = null
   feedbackFailure = false
+  feedbackPending = false
   completionResponse = completion
   progressResponse = progress
   recentResponse = recent
@@ -481,6 +486,18 @@ describe('App', () => {
     await waitFor(() => drillIssued > issuedBefore, 'a fresh drill request')
     await waitFor(() => shownDrill() === DRILL_TEXT, 'the fresh drill')
     expect(bodyText()).not.toContain('This attempt can no longer be scored.')
+  })
+
+  it('says the coach is reading until the first token', async () => {
+    feedbackPending = true
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(
+      () => bodyText().includes('Coach is reading the run'),
+      'the coach loading line',
+    )
   })
 
   it('keeps the scored result when the coach stream fails', async () => {

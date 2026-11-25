@@ -748,7 +748,7 @@ function CoachNote({ sessionId }: { sessionId: string }) {
         {state === 'error'
           ? 'Coaching is unavailable right now. Your metrics are saved.'
           : text === '' && state === 'streaming'
-            ? 'Reading your run\u2026'
+            ? 'Coach is reading the run'
             : text}
         {state === 'streaming' && text !== '' ? (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-stone-300 align-text-bottom motion-reduce:animate-none dark:bg-stone-600" />

@@ -34,7 +34,9 @@ whatever pair or finger still makes you hesitate.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
-  steady reach. Each is also followed across recent completed drills: "dk: mean
+  steady reach. The coach panel says "Coach is reading the run" until its first
+  token arrives; a failed stream keeps one plain sentence. Each note is also
+  followed across recent completed drills: "dk: mean
   610 ms → 480 ms over your last 3 drills" for the pair, and "Left ring: mean
   720 ms → 560 ms over your last 2 drills" for the reach. They are extra context,
   so a failed read leaves the note standing. Raw charts are deliberately absent.
