@@ -7,6 +7,7 @@ import java.util.UUID;
  * A drill a reloaded tab can continue. {@code nextSeq} is one past the highest
  * keystroke already stored, so the client never collides with existing events.
  * {@code position} is the cursor index and {@code elapsedMs} is active time.
+ * The counts seed the resume display without re-reading every event.
  */
 public record ActiveSessionResponse(
 		UUID sessionId,
@@ -18,5 +19,8 @@ public record ActiveSessionResponse(
 		long nextSeq,
 		long keystrokes,
 		int position,
-		long elapsedMs) {
+		long elapsedMs,
+		int typedCount,
+		int scoredCount,
+		int correctCount) {
 }

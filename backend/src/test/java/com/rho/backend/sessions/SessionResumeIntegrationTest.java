@@ -67,6 +67,38 @@ class SessionResumeIntegrationTest {
 			assertThat(active.keystrokes()).isEqualTo(3);
 			assertThat(active.position()).isEqualTo(3);
 			assertThat(active.elapsedMs()).isEqualTo(900);
+			assertThat(active.typedCount()).isEqualTo(3);
+			assertThat(active.scoredCount()).isEqualTo(3);
+			assertThat(active.correctCount()).isEqualTo(3);
+		}
+		finally {
+			deleteUser(guest.guestId());
+		}
+	}
+
+	@Test
+	void storedFirstAttemptsSeedAccuracyAfterReload() {
+		GuestTokenResponse guest = guest();
+		UUID sessionId = UUID.randomUUID();
+		insertActive(guest.guestId(), sessionId);
+
+		try {
+			insertEvent(sessionId, 0, 0, "KEY", true);
+			insertEvent(sessionId, 1, 1, "KEY", false);
+
+			ActiveSessionResponse active = client.get()
+					.uri("/api/v1/sessions/active")
+					.headers(headers -> headers.setBearerAuth(guest.token()))
+					.exchange()
+					.expectStatus().isOk()
+					.expectBody(ActiveSessionResponse.class)
+					.returnResult()
+					.getResponseBody();
+
+			assertThat(active).isNotNull();
+			assertThat(active.typedCount()).isEqualTo(2);
+			assertThat(active.scoredCount()).isEqualTo(2);
+			assertThat(active.correctCount()).isEqualTo(1);
 		}
 		finally {
 			deleteUser(guest.guestId());
@@ -123,6 +155,9 @@ class SessionResumeIntegrationTest {
 			assertThat(active.keystrokes()).isZero();
 			assertThat(active.position()).isZero();
 			assertThat(active.elapsedMs()).isZero();
+			assertThat(active.typedCount()).isZero();
+			assertThat(active.scoredCount()).isZero();
+			assertThat(active.correctCount()).isZero();
 		}
 		finally {
 			deleteUser(guest.guestId());
@@ -223,23 +258,29 @@ class SessionResumeIntegrationTest {
 	}
 
 	private void insertEvent(UUID sessionId, int seq) {
-		insertEvent(sessionId, seq, seq, "KEY");
+		insertEvent(sessionId, seq, seq, "KEY", true);
 	}
 
 	private void insertEvent(UUID sessionId, int seq, int position, String kind) {
+		insertEvent(sessionId, seq, position, kind, true);
+	}
+
+	private void insertEvent(
+			UUID sessionId, int seq, int position, String kind, boolean correct) {
 		var spec = databaseClient.sql("""
 						INSERT INTO keystroke_events (session_id, seq, position, kind, expected_char,
 						                              actual_char, is_correct, t_ms, display_ms,
 						                              is_warmup)
-						VALUES (:sessionId, :seq, :position, :kind, 'a', :actual, true,
+						VALUES (:sessionId, :seq, :position, :kind, 'a', :actual, :correct,
 						        :t, 100, false)
 						""")
 				.bind("sessionId", sessionId)
 				.bind("seq", seq)
 				.bind("position", position)
 				.bind("kind", kind)
+				.bind("correct", correct)
 				.bind("t", (seq + 1) * 300);
-		spec = "BACKSPACE".equals(kind)
+		spec = "BACKSPACE".equals(kind) || !correct
 				? spec.bindNull("actual", String.class)
 				: spec.bind("actual", "a");
 		spec.fetch().rowsUpdated().block();

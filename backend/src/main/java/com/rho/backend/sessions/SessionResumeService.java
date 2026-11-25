@@ -19,22 +19,31 @@ import reactor.core.publisher.Mono;
 public class SessionResumeService {
 
 	private static final String SEQUENCE = """
-			SELECT COALESCE(MAX(seq) + 1, 0) AS next_seq,
-			       COUNT(*) AS total,
+			WITH session_events AS (
+			    SELECT * FROM keystroke_events WHERE session_id = :sessionId
+			),
+			first_attempts AS (
+			    SELECT DISTINCT ON (position) position, is_correct
+			    FROM session_events
+			    WHERE kind = 'KEY' AND NOT is_warmup
+			    ORDER BY position, seq
+			)
+			SELECT COALESCE((SELECT MAX(seq) + 1 FROM session_events), 0) AS next_seq,
+			       (SELECT COUNT(*) FROM session_events) AS total,
 			       COALESCE((
-			           SELECT position FROM keystroke_events
-			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
+			           SELECT position FROM session_events ORDER BY seq DESC LIMIT 1
 			       ), 0) AS last_position,
 			       COALESCE((
-			           SELECT kind FROM keystroke_events
-			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
+			           SELECT kind FROM session_events ORDER BY seq DESC LIMIT 1
 			       ), 'KEY') AS last_kind,
 			       COALESCE((
-			           SELECT t_ms FROM keystroke_events
-			           WHERE session_id = :sessionId ORDER BY seq DESC LIMIT 1
-			       ), 0) AS last_t
-			FROM keystroke_events
-			WHERE session_id = :sessionId
+			           SELECT t_ms FROM session_events ORDER BY seq DESC LIMIT 1
+			       ), 0) AS last_t,
+			       (SELECT COUNT(*) FROM session_events
+			        WHERE kind = 'KEY' AND NOT is_warmup) AS typed_count,
+			       (SELECT COUNT(*) FROM first_attempts) AS scored_count,
+			       (SELECT COUNT(*) FROM first_attempts
+			        WHERE is_correct) AS correct_count
 			""";
 
 	private final TypingSessionRepository sessions;
@@ -63,7 +72,10 @@ public class SessionResumeService {
 								position.nextSeq(),
 								position.total(),
 								position.cursor(),
-								position.elapsedMs()))))
+								position.elapsedMs(),
+								position.typed(),
+								position.scored(),
+								position.correct()))))
 				.defaultIfEmpty(Optional.empty());
 	}
 
@@ -81,11 +93,21 @@ public class SessionResumeService {
 							row.get("next_seq", Integer.class),
 							total,
 							cursor,
-							row.get("last_t", Integer.class));
+							row.get("last_t", Integer.class),
+							row.get("typed_count", Integer.class),
+							row.get("scored_count", Integer.class),
+							row.get("correct_count", Integer.class));
 				})
 				.one();
 	}
 
-	private record Sequence(int nextSeq, long total, int cursor, long elapsedMs) {
+	private record Sequence(
+			int nextSeq,
+			long total,
+			int cursor,
+			long elapsedMs,
+			int typed,
+			int scored,
+			int correct) {
 	}
 }

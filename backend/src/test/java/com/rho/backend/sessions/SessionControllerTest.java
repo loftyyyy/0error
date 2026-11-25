@@ -57,7 +57,7 @@ class SessionControllerTest {
 	void anOpenDrillIsReturnedForResume() {
 		ActiveSessionResponse active = new ActiveSessionResponse(
 				SESSION_ID, 0, "Home row", "asdf jkl;", "asdfjkl; ",
-				OffsetDateTime.now(), 4, 3, 3, 900);
+				OffsetDateTime.now(), 4, 3, 3, 900, 3, 3, 3);
 		when(resume.find(USER_ID)).thenReturn(Mono.just(java.util.Optional.of(active)));
 
 		ResponseEntity<ActiveSessionResponse> response =
