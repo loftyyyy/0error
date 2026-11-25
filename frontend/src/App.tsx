@@ -10,6 +10,7 @@ import type { ProgressSummary } from './features/progress/progressApi'
 import {
   completeServerSession,
   createServerSession,
+  fetchActiveSession,
   fetchRecentSessions,
   SessionGoneError,
 } from './features/sessions/sessionApi'
@@ -35,6 +36,12 @@ interface ActiveDrill {
   text: string
   /** Last drill in the set, used to avoid repeating it on the next attempt. */
   tail: string
+  /** Present when the drill was restored from the server after a reload. */
+  resume?: {
+    position: number
+    seq: number
+    elapsedMs: number
+  }
 }
 
 /** Where the next drill comes from. Omitted fields mean "ask the server". */
@@ -68,6 +75,27 @@ function App() {
         const summary = await fetchProgress()
         if (cancelled) return
         setProgress(summary)
+
+        // A reload should continue the drill it already started. A failed
+        // check is not fatal: the guest still gets a fresh drill.
+        const active = await fetchActiveSession().catch(() => null)
+        if (cancelled) return
+        if (active) {
+          setDrill({
+            sessionId: active.sessionId,
+            tier: active.tier,
+            tierName: active.tierName,
+            text: active.text,
+            tail: '',
+            resume: {
+              position: active.position,
+              seq: active.nextSeq,
+              elapsedMs: active.elapsedMs,
+            },
+          })
+          setPhase('ready')
+          return
+        }
 
         const tier = next.tier ?? activeTier(summary)
         const fetched = await fetchDrillSet(tier, next.exclude, next.focus, next.finger)
@@ -277,6 +305,10 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
     sessionId: drill.sessionId,
     text: drill.text,
     onComplete,
+    initialPosition: drill.resume?.position,
+    initialSeq: drill.resume?.seq,
+    initialElapsedMs: drill.resume?.elapsedMs,
+    warmupOnStart: Boolean(drill.resume),
   })
 
   // "Next drill" and "Try again" unmount the button that was pressed, so park
@@ -342,9 +374,11 @@ function Drill({ drill, scoring, onComplete }: DrillProps) {
               ? 'Drill complete. Nothing to rush.'
               : isPaused
                 ? 'Paused. Click here to continue.'
-                : snapshot.warmupRemaining > 0
-                  ? 'Back in rhythm.'
-                  : 'Keep it smooth.'}
+                : drill.resume && snapshot.index === drill.resume.position
+                  ? 'Picked up where you left off.'
+                  : snapshot.warmupRemaining > 0
+                    ? 'Back in rhythm.'
+                    : 'Keep it smooth.'}
         </span>
 
         <span className="flex items-center gap-5 tabular-nums text-stone-400 dark:text-stone-500">

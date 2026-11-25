@@ -9,9 +9,9 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  196 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 192 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 100 tests in 16 files, oxlint clean,
+  197 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 193 pass, including the Postgres-backed acceptance tests.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 108 tests in 17 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The result panel can now act on its own analysis. The focus line offers "Practise dk" and the reach line offers "Practise Left ring"; either starts a fresh three-drill attempt with `focus=` or `finger=` sent on every drill request, so the server targets that weakness immediately. The action reuses the existing loading pipeline, keeps the same tier, and excludes the previous tail. `fetchNextDrill` and `fetchDrillSet` gained the two optional parameters; tests pin the URL for each, prove all three drills carry the focus, and click each action in the App to prove three focused requests. Frontend now 100 tests. |
+| `HEAD`    | A reload now resumes the open drill instead of starting fresh. `GET /sessions/active` gained `position` and `elapsedMs`: a KEY advances the cursor, a BACKSPACE leaves it at the corrected index, and an empty session starts at zero. The browser asks for the active drill before creating one, restores the cursor, next sequence, and active clock, and marks the next three keys warmup. The status line says "Picked up where you left off." A failed resume check falls back to a fresh drill. Tests: backend covers three keys, a trailing backspace, and an untouched drill; the engine covers restored cursor, sequence, clock, and warmup; `fetchActiveSession` covers body, `204`, malformed, and failure; a dedicated App test proves no drill or session is created and the completion uses the stored sequence. Frontend 108 tests, backend 197. |
+| `4161611` | `GET /sessions/active` returns the cursor position and active time beside `nextSeq`, derived from the last stored keystroke. |
+| `3b2967c` | The focus and reach notes offer "Practise dk" and "Practise Left ring". Each starts a three-drill attempt with `focus=` or `finger=` on every request. |
 | `752a93c` | Compose now works with Postgres 18: the volume mounts `/var/lib/postgresql`, host port is `${POSTGRES_PORT:-5432}`, and the duplicate `docker-compose.yml` is gone. Healthy container on 55432, PostgreSQL 18.7, V1 to V10 from empty, full backend suite green. |
 | `98e75d9` | Backend gaps closed without schema: `finger` focus on drills, `GET /sessions/active` with `nextSeq`, and a daily `TrendBackfillJob` that repairs missing per-session trend rows from retained keystrokes without re-merging rolling totals. |
 | `11c5c99` | `GET /drills/next` accepts an explicit `focus` pair, validated against the tier charset and the lock. Malformed focus, an outside pair, and a locked tier answer `400`, `400`, and `403`. Controller tests now cover drills, progress, fingers, weak pairs, and sessions; an HTTP test proves the focus path. |
@@ -87,10 +89,13 @@ commit `HEAD`; older rows keep their real hashes.
   query instead of three. `finger` works the same way and cannot be combined with
   `focus`. The issue, validation, and lock rules stay identical to an
   automatically focused drill.
-- **Resume returns a sequence, not a replay.** `GET /sessions/active` answers
-  `204` or the newest ACTIVE session with `nextSeq` one past the highest stored
-  keystroke, so a reloaded tab appends instead of colliding. Only the owner sees
-  it; completed attempts and other guests are invisible.
+- **Resume returns a sequence and a cursor, not a replay.** `GET /sessions/active`
+  answers `204` or the newest ACTIVE session with `nextSeq` one past the highest
+  stored keystroke, `position` derived from the last KEY or BACKSPACE, and the
+  active clock. A reloaded tab appends instead of colliding and starts at the
+  stored index. Earlier rhythm shading is not rebuilt; the progress bar carries
+  the position. Only the owner sees it; completed attempts and other guests are
+  invisible.
 - **Backfill is repair, not recomputation.** The daily job rebuilds per-session
   trend rows only where they are missing and raw keystrokes still exist. It never
   merges the rolling aggregates again, because those already counted the session;
@@ -307,11 +312,10 @@ None of these blocks the app; they are the next things worth doing, in order.
 2. **Shared pacing, only if hosted on more than one instance.** The sign-in
    bucket is per process, so two instances each allow the full burst. A shared
    counter in Postgres would fix it; a single instance does not need one.
-3. **A resume path in the browser.** `GET /sessions/active` answers with the open
-   drill and `nextSeq`, but not the typed position, and the frontend still starts
-   a fresh drill on load. Wiring it would remove the abandoned-session gap after a
-   reload. The backend must return the position; the typing engine also needs an
-   initial position and sequence.
+3. **Production packaging.** No `Dockerfile` or deploy pipeline yet. Add a
+   multi-stage backend image, Azure Container Apps or App Service, managed
+   Postgres with SSL, and Vercel for the frontend. Keep one backend replica until
+   shared sign-in pacing and scheduled-job leadership exist.
 
 ## Housekeeping
 

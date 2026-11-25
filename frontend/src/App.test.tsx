@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { FingerStat, FingerTrend } from './features/progress/fingerApi'
 import type { WeakPair, WeakPairTrend } from './features/progress/weakPairApi'
-import type { RecentSession, SessionCompletion } from './features/sessions/sessionApi'
+import type {
+  ActiveSession,
+  RecentSession,
+  SessionCompletion,
+} from './features/sessions/sessionApi'
 import { countPendingBatches } from './features/telemetry/keystrokeQueue'
 import { drainOutbox } from './features/telemetry/telemetryBuffer'
 
@@ -159,6 +163,9 @@ let recentResponse: RecentSession[] = recent
 /** When set, the history request fails with this status. */
 let recentFailure: number | null = null
 
+/** An open drill the server reports on load, or null for a fresh start. */
+let activeSession: ActiveSession | null = null
+
 /** The weakest pair the result panel follows; empty means no focus note. */
 let focusPairs: WeakPair[] = []
 
@@ -242,6 +249,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     if (telemetryFailure !== null) return json({ error: 'temporarily unavailable' }, telemetryFailure)
     return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   }
+  if (url.includes('/api/v1/sessions/active')) {
+    if (activeSession === null) return new Response(null, { status: 204 })
+    return json(activeSession)
+  }
   if (url.includes('/api/v1/sessions/recent')) {
     if (recentFailure !== null) return json({ error: 'temporarily unavailable' }, recentFailure)
     return json({ sessions: recentResponse })
@@ -297,6 +308,7 @@ beforeEach(async () => {
   progressResponse = progress
   recentResponse = recent
   recentFailure = null
+  activeSession = null
   focusPairs = []
   focusTrend = null
   fingerStats = []

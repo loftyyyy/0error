@@ -113,6 +113,62 @@ export async function fetchRecentSessions(limit = 5): Promise<RecentSession[]> {
 export class SessionGoneError extends Error {}
 
 /**
+ * The drill a reloaded tab can continue. The cursor and sequence come from the
+ * server so a resumed attempt appends to the same telemetry stream.
+ */
+export interface ActiveSession {
+  sessionId: string
+  tier: number
+  tierName: string
+  text: string
+  charset: string
+  startedAt: string
+  nextSeq: number
+  keystrokes: number
+  position: number
+  elapsedMs: number
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+/**
+ * Returns the open drill, or null when nothing is active. A failed check is
+ * surfaced so the caller can decide whether to start fresh or show an error.
+ */
+export async function fetchActiveSession(): Promise<ActiveSession | null> {
+  const response = await authedFetch('/api/v1/sessions/active', {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (response.status === 204) return null
+  if (!response.ok) {
+    throw new Error(`Could not check for an open drill (${response.status})`)
+  }
+
+  const body = (await response.json()) as Partial<ActiveSession>
+  if (
+    typeof body.sessionId !== 'string' ||
+    body.sessionId.length === 0 ||
+    !isCount(body.tier) ||
+    typeof body.tierName !== 'string' ||
+    typeof body.text !== 'string' ||
+    body.text.length === 0 ||
+    typeof body.charset !== 'string' ||
+    typeof body.startedAt !== 'string' ||
+    !isCount(body.nextSeq) ||
+    !isCount(body.keystrokes) ||
+    !isCount(body.position) ||
+    body.position > body.text.length ||
+    !isCount(body.elapsedMs)
+  ) {
+    throw new Error('The resume response was invalid')
+  }
+  return body as ActiveSession
+}
+
+/**
  * Closes the session and asks the server to score it. Telemetry must be
  * flushed first: the server recomputes every metric from the raw events.
  */

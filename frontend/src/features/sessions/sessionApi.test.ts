@@ -260,3 +260,75 @@ describe('fetchRecentSessions', () => {
     )
   })
 })
+
+describe('fetchActiveSession', () => {
+  const active = {
+    sessionId: 'session-resume',
+    tier: 0,
+    tierName: 'Home row',
+    text: 'asdf jkl; asdf',
+    charset: 'asdfjkl; ',
+    startedAt: '2026-11-25T10:00:00Z',
+    nextSeq: 7,
+    keystrokes: 7,
+    position: 5,
+    elapsedMs: 4200,
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    const storage = new MemoryStorage()
+    storage.setItem(GUEST_TOKEN_KEY, 'g_existing')
+    storage.setItem(GUEST_ID_KEY, 'guest-existing')
+    vi.stubGlobal('localStorage', storage)
+  })
+
+  it('returns the open drill with its cursor and sequence', async () => {
+    const fetchMock = vi.fn<
+      (url: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async () => jsonResponse(active))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { fetchActiveSession } = await import('./sessionApi')
+    const resumed = await fetchActiveSession()
+
+    expect(resumed).toEqual(active)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('/api/v1/sessions/active')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer g_existing')
+  })
+
+  it('returns null when nothing is open', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })))
+
+    const { fetchActiveSession } = await import('./sessionApi')
+
+    await expect(fetchActiveSession()).resolves.toBeNull()
+  })
+
+  it('rejects an incomplete resume body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ ...active, position: 'five' })),
+    )
+
+    const { fetchActiveSession } = await import('./sessionApi')
+
+    await expect(fetchActiveSession()).rejects.toThrow(
+      'The resume response was invalid',
+    )
+  })
+
+  it('reports a resume that cannot be loaded', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'unavailable' }, 503)),
+    )
+
+    const { fetchActiveSession } = await import('./sessionApi')
+
+    await expect(fetchActiveSession()).rejects.toThrow(
+      'Could not check for an open drill (503)',
+    )
+  })
+})

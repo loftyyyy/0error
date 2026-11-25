@@ -53,6 +53,14 @@ export interface TypingEngineOptions {
   allowBackspace?: boolean
   /** Scopes the event sequence to one drill session. */
   sessionId?: string
+  /** Cursor restored from the server after a reload. */
+  initialPosition?: number
+  /** Next telemetry sequence restored from the server. */
+  initialSeq?: number
+  /** Active time already spent before the reload. */
+  initialElapsedMs?: number
+  /** The first keys after a reload are warmup. */
+  warmupOnStart?: boolean
 }
 
 export const WARMUP_KEYSTROKES = 3
@@ -101,8 +109,19 @@ export class TypingEngine {
     this.sessionId = options.sessionId ?? ''
     this.now = options.now ?? (() => performance.now())
     this.allowBackspace = options.allowBackspace ?? true
-    this.startedAt = this.now()
-    this.targetShownAt = 0
+
+    const restoredPosition = Math.min(
+      Math.max(0, options.initialPosition ?? 0),
+      text.length,
+    )
+    const elapsed = Math.max(0, options.initialElapsedMs ?? 0)
+
+    this.position = restoredPosition
+    this.seq = Math.max(0, options.initialSeq ?? 0)
+    this.startedAt = this.now() - elapsed
+    this.targetShownAt = elapsed
+    this.warmupRemaining = options.warmupOnStart ? WARMUP_KEYSTROKES : 0
+    this.status = restoredPosition >= text.length ? 'complete' : 'running'
     this.quality = new Array(text.length).fill(null)
   }
 

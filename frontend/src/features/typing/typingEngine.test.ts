@@ -34,6 +34,48 @@ describe('TypingEngine', () => {
     expect(engine.press('a', 300)).toBeNull()
   })
 
+  it('starts from a stored cursor, sequence, and clock after a reload', () => {
+    const clock = fakeClock(10_000)
+    const engine = new TypingEngine('asdf', {
+      now: clock.now,
+      initialPosition: 2,
+      initialSeq: 5,
+      initialElapsedMs: 4_000,
+      warmupOnStart: true,
+    })
+
+    expect(engine.getSnapshot()).toMatchObject({
+      index: 2,
+      elapsedMs: 4_000,
+      warmupRemaining: WARMUP_KEYSTROKES,
+    })
+
+    const key = engine.press('d', 10_500)
+
+    expect(key).toMatchObject({
+      seq: 5,
+      position: 2,
+      t: 4_500,
+      displayMs: 500,
+      warmup: true,
+    })
+    expect(engine.press('f', 10_600)).toMatchObject({
+      seq: 6,
+      position: 3,
+      warmup: true,
+    })
+  })
+
+  it('rejects a stored cursor outside the drill', () => {
+    const engine = new TypingEngine('as', {
+      initialPosition: 9,
+      initialSeq: 3,
+    })
+
+    expect(engine.getSnapshot().index).toBe(2)
+    expect(engine.getSnapshot().status).toBe('complete')
+  })
+
   it('keeps the first-attempt error when a character is corrected', () => {
     const clock = fakeClock()
     const engine = new TypingEngine('as', { now: clock.now })

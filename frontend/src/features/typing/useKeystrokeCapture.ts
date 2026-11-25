@@ -13,6 +13,11 @@ export interface UseKeystrokeCaptureOptions {
   text: string
   apiBaseUrl?: string
   allowBackspace?: boolean
+  /** Cursor, sequence, and clock restored after a reload. */
+  initialPosition?: number
+  initialSeq?: number
+  initialElapsedMs?: number
+  warmupOnStart?: boolean
   onComplete?: (snapshot: TypingSnapshot) => void
 }
 
@@ -49,12 +54,38 @@ function isControlTarget(target: EventTarget | null): boolean {
  * before upload.
  */
 export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): KeystrokeCapture {
-  const { sessionId, text, apiBaseUrl, allowBackspace = true, onComplete } = options
+  const {
+    sessionId,
+    text,
+    apiBaseUrl,
+    allowBackspace = true,
+    initialPosition,
+    initialSeq,
+    initialElapsedMs,
+    warmupOnStart,
+    onComplete,
+  } = options
 
   // A new drill or session gets a new engine, sequence space, and clock.
   const engine = useMemo(
-    () => new TypingEngine(text, { allowBackspace, sessionId }),
-    [text, allowBackspace, sessionId],
+    () =>
+      new TypingEngine(text, {
+        allowBackspace,
+        sessionId,
+        initialPosition,
+        initialSeq,
+        initialElapsedMs,
+        warmupOnStart,
+      }),
+    [
+      text,
+      allowBackspace,
+      sessionId,
+      initialPosition,
+      initialSeq,
+      initialElapsedMs,
+      warmupOnStart,
+    ],
   )
 
   const subscribe = useCallback(
