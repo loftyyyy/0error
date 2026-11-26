@@ -245,6 +245,7 @@ function App() {
             result={result}
             progress={progress}
             onNext={() => startNext(result.unlockedTier ?? drill.tier, drill.tail)}
+            onPractiseTier={(tier) => startNext(tier)}
             onPracticePair={(pair) => startNext(drill.tier, drill.tail, pair)}
             onPracticeFinger={(finger) => startNext(drill.tier, drill.tail, undefined, finger)}
           />
@@ -448,6 +449,7 @@ function ResultPanel({
   result,
   progress,
   onNext,
+  onPractiseTier,
   onPracticePair,
   onPracticeFinger,
 }: {
@@ -455,6 +457,7 @@ function ResultPanel({
   result: SessionCompletion
   progress: ProgressSummary | null
   onNext: () => void
+  onPractiseTier: (tier: number) => void
   onPracticePair: (pair: string) => void
   onPracticeFinger: (finger: string) => void
 }) {
@@ -525,7 +528,13 @@ function ResultPanel({
         </ul>
       ) : null}
 
-      {progress ? <TierLadder progress={progress} currentTier={result.tier} /> : null}
+      {progress ? (
+        <TierLadder
+          progress={progress}
+          currentTier={result.tier}
+          onPractiseTier={onPractiseTier}
+        />
+      ) : null}
 
       <CoachNote sessionId={drill.sessionId} />
       <FocusNote key={`focus-${result.tier}`} tier={result.tier} onPractice={onPracticePair} />
@@ -552,9 +561,11 @@ function ResultPanel({
 function TierLadder({
   progress,
   currentTier,
+  onPractiseTier,
 }: {
   progress: ProgressSummary
   currentTier: number
+  onPractiseTier: (tier: number) => void
 }) {
   const next = progress.tiers.find((tier) => !tier.unlocked)
 
@@ -577,7 +588,18 @@ function TierLadder({
               }
             >
               <span aria-hidden="true">{tier.unlocked ? '\u25cf' : '\u25cb'}</span>{' '}
-              {tier.name}
+              {tier.unlocked ? (
+                <button
+                  type="button"
+                  onClick={() => onPractiseTier(tier.tier)}
+                  aria-label={`Practise ${tier.name}`}
+                  className="underline underline-offset-2 hover:text-stone-900 dark:hover:text-stone-50"
+                >
+                  {tier.name}
+                </button>
+              ) : (
+                tier.name
+              )}
               {current ? <span className="sr-only"> (current)</span> : null}
             </li>
           )

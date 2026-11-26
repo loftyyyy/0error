@@ -51,7 +51,8 @@ whatever pair or finger still makes you hesitate.
   fresh drill, so the abandoned one does not return.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
-  three failed attempts.
+  three failed attempts. Unlocked tier names are quiet buttons; choosing one
+  starts another attempt at that tier.
 - A missed gate is stated as advice, one line per criterion: "Median 512 ms:
   needs 450 ms or less." The list is not raw diagnostics in monospace.
 - A collapsed "Recent drills" list under the result shows the guest's five most

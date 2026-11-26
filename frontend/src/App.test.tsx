@@ -953,6 +953,43 @@ describe('App', () => {
     expect(bodyText()).toContain('All')
   })
 
+  it('practises any unlocked tier from the ladder', async () => {
+    progressResponse = {
+      tiers: progress.tiers.map((tier) =>
+        tier.tier <= 1 ? { ...tier, unlocked: true } : tier,
+      ),
+    }
+
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    for (const key of DRILL_TEXT) await press(key)
+
+    await waitFor(() => bodyText().includes('Top row'), 'the ladder')
+    const before = calls.filter(
+      (call) => call.url.includes('/drills/next') && call.url.includes('tier=1'),
+    ).length
+    const topRow = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent?.includes('Top row'),
+    )
+    expect(topRow).toBeDefined()
+
+    await act(async () => {
+      topRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    await waitFor(
+      () =>
+        calls.filter(
+          (call) =>
+            call.url.includes('/drills/next') && call.url.includes('tier=1'),
+        ).length >= before + 3,
+      'a drill for the chosen tier',
+    )
+    const chosen = calls.filter(
+      (call) => call.url.includes('/drills/next') && call.url.includes('tier=1'),
+    )
+    expect(chosen.length - before).toBe(3)
+  })
+
   it('still shows the score when the history request fails', async () => {
     recentFailure = 500
 
