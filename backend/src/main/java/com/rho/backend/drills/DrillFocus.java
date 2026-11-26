@@ -30,4 +30,28 @@ public record DrillFocus(List<String> pairs, Finger finger) {
 	public boolean empty() {
 		return pairs.isEmpty() && finger == null;
 	}
+
+	/**
+	 * True when the drill actually exercises this focus: every requested pair is
+	 * present, or at least one key the finger owns appears. No focus accepts all.
+	 */
+	public boolean matches(String text) {
+		if (text == null || text.isBlank()) {
+			return false;
+		}
+		if (!pairs.isEmpty()) {
+			return pairs.stream()
+					.filter(pair -> pair != null && pair.length() == 2)
+					.allMatch(text::contains);
+		}
+		if (finger != null) {
+			for (char key : finger.baseKeys().toCharArray()) {
+				if (key != ' ' && text.indexOf(key) >= 0) {
+					return true;
+				}
+			}
+			return false;
+		}
+		return true;
+	}
 }

@@ -137,7 +137,8 @@ public class DrillService {
 	private Mono<DrillResponse> serve(
 			UUID userId, TierDefinition definition, DrillFocus focus, String exclude) {
 		Optional<String> generated = aiDrills.take(definition.tier(), focus, exclude)
-				.filter(candidate -> validator.isValid(candidate, definition));
+				.filter(candidate -> validator.isValid(candidate, definition))
+				.filter(focus::matches);
 
 		String source = generated.isPresent() ? "AI" : "STATIC";
 		String text = generated.orElseGet(() -> pool.pick(definition.tier(), focus, exclude));

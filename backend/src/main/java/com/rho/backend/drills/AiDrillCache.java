@@ -59,7 +59,8 @@ public class AiDrillCache {
 
 	/** Takes the oldest usable drill for this tier and focus set. */
 	public Optional<String> take(int tier, DrillFocus focus, String exclude) {
-		FocusQueue queue = byKey.get(cacheKey(tier, focus));
+		DrillFocus target = focus == null ? DrillFocus.none() : focus;
+		FocusQueue queue = byKey.get(cacheKey(tier, target));
 		if (queue == null) {
 			return Optional.empty();
 		}
@@ -72,6 +73,10 @@ public class AiDrillCache {
 				continue;
 			}
 			if (exclude != null && exclude.equals(candidate.text())) {
+				continue;
+			}
+			// A model can ignore the prompt; never serve a drill without the focus.
+			if (!target.matches(candidate.text())) {
 				continue;
 			}
 			return Optional.of(candidate.text());
@@ -108,6 +113,7 @@ public class AiDrillCache {
 
 		generator.generate(tier, target, exclude)
 				.filter(text -> validator.isValid(text, tier))
+				.filter(target::matches)
 				.doOnNext(text -> store(key, text))
 				.doOnError(error -> log.warn("Drill generation failed for tier {}", tier.tier(), error))
 				.onErrorResume(error -> Mono.empty())

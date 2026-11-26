@@ -173,6 +173,19 @@ class DrillServiceTest {
 	}
 
 	@Test
+	void aCachedDrillMissingTheRequestedPairIsRejected() {
+		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
+		when(aiDrills.take(0, DrillFocus.of(List.of("jk")), null))
+				.thenReturn(Optional.of("asdf asdf asdf asdf asdf asdf asdf asdf asdf"));
+
+		DrillResponse drill = service().next(USER_ID, 0, "jk", null, null).block();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.source()).isEqualTo("STATIC");
+		assertThat(drill.text()).contains("jk");
+	}
+
+	@Test
 	void explicitFocusMustBeOnePairTheTierAllows() {
 		StepVerifier.create(service().next(USER_ID, 0, "f", null))
 				.expectErrorSatisfies(error -> {

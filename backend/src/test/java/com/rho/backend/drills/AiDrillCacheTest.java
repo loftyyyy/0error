@@ -113,6 +113,17 @@ class AiDrillCacheTest {
 	}
 
 	@Test
+	void refillRejectsADrillThatMissesTheRequestedPair() {
+		String noPair = "asdf asdf asdf asdf asdf asdf asdf asdf asdf";
+		AiDrillCache cache = cache(generator(noPair), properties(2, 60));
+
+		cache.refill(homeRow, List.of("jk"), null);
+
+		assertThat(cache.take(0, List.of("jk"), null)).isEmpty();
+		assertThat(cache.size(0)).isZero();
+	}
+
+	@Test
 	void focusKeysAreBoundedAndTheEldestIsEvicted() throws InterruptedException {
 		AiDrillCache cache = cache(
 				generator(staticDrills.toArray(String[]::new)), properties(2, 60, 2));

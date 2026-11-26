@@ -104,6 +104,23 @@ class DrillFocusAcceptanceTest {
 	}
 
 	@Test
+	void aPairTheTypistAsksForAppearsInTheServedText() {
+		String token = guestToken();
+
+		DrillResponse drill = client.get()
+				.uri("/api/v1/drills/next?tier=0&focus=jk")
+				.headers(headers -> headers.setBearerAuth(token))
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(DrillResponse.class)
+				.returnResult()
+				.getResponseBody();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.text()).contains("jk");
+	}
+
+	@Test
 	void aPairOutsideTheTierCharsetIsRejected() {
 		String token = guestToken();
 
