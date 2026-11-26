@@ -255,6 +255,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     if (telemetryFailure !== null) return json({ error: 'temporarily unavailable' }, telemetryFailure)
     return json({ sessionId: 'session-1', received: 8, inserted: 8, duplicates: 0 })
   }
+  if (url.includes('/abandon')) return new Response(null, { status: 204 })
   if (url.includes('/api/v1/sessions/active')) {
     if (activeSession === null) return new Response(null, { status: 204 })
     return json(activeSession)
@@ -819,6 +820,30 @@ describe('App', () => {
     )
     expect(heading).toBeDefined()
     expect(document.activeElement).toBe(heading)
+  })
+
+  it('restarts the active drill with Ctrl+Enter', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    const before = calls.filter((call) => call.url.includes('/drills/next')).length
+
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          ctrlKey: true,
+          cancelable: true,
+        }),
+      )
+    })
+
+    await waitFor(
+      () => calls.some((call) => call.url.includes('/sessions/session-1/abandon')),
+      'the restart abandon request',
+    )
+    await waitFor(
+      () => calls.filter((call) => call.url.includes('/drills/next')).length >= before + 3,
+      'a fresh drill set',
+    )
   })
 
   it('practises the weakest pair on request', async () => {

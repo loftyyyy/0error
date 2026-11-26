@@ -45,8 +45,8 @@ export function KeyboardGuide({
 
   const keyClass = (active: boolean) =>
     active
-      ? 'fill-stone-900 stroke-stone-900 transition-colors duration-300 dark:fill-stone-100 dark:stroke-stone-100'
-      : 'fill-transparent stroke-stone-300 transition-colors duration-300 dark:stroke-stone-700'
+      ? 'fill-stone-900 stroke-stone-900 dark:fill-stone-100 dark:stroke-stone-100'
+      : 'fill-transparent stroke-stone-300 dark:stroke-stone-700'
 
   const labelClass = (active: boolean) =>
     active ? 'fill-stone-50 dark:fill-stone-950' : 'fill-stone-500 dark:fill-stone-400'

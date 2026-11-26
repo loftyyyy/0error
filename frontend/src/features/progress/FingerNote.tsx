@@ -87,7 +87,7 @@ export function FingerNote({
   return (
     <>
       <p className="mt-2 text-xs leading-relaxed text-stone-400 dark:text-stone-500">
-        <span className="tracking-[0.15em] uppercase">Reach</span>
+        <span className="text-[0.65rem] font-medium tracking-[0.2em] uppercase">Reach</span>
         <span className="mx-2 text-stone-300 dark:text-stone-700">/</span>
         {weakest.label}, still finding its rhythm.
       </p>

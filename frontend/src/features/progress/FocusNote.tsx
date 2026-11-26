@@ -78,8 +78,8 @@ export function FocusNote({
 
   return (
     <>
-      <p className="mt-6 text-xs leading-relaxed text-stone-400 dark:text-stone-500">
-        <span className="tracking-[0.15em] uppercase">Focus</span>
+      <p className="mt-4 text-xs leading-relaxed text-stone-400 dark:text-stone-500">
+        <span className="text-[0.65rem] font-medium tracking-[0.2em] uppercase">Focus</span>
         <span className="mx-2 text-stone-300 dark:text-stone-700">/</span>
         Your next drills lean on <span className="font-mono">{phrase}</span>.
       </p>

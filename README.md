@@ -3,7 +3,8 @@
 A minimalist touch-typing tutor that starts you on the home row within seconds and
 never asks you to sign up. The browser captures every keystroke locally, the
 server turns those raw events into the metrics, and the next drill leans on
-whatever pair or finger still makes you hesitate.
+whatever pair or finger still makes you hesitate. A drill requested for a pair
+must contain it; generated text that ignores the target is discarded.
 
 ## How a session works
 
@@ -25,10 +26,12 @@ whatever pair or finger still makes you hesitate.
 ## In the browser
 
 - The keyboard drawing reveals the next key only after 1.2 s without input and
-  names the finger that reaches it. Shifted symbols point at the base key and
-  add a Shift hint.
+  names the finger that reaches it. Once shown, the key swaps without a color
+  transition. Shifted symbols point at the base key and add a Shift hint.
 - A touch-only device is told a physical keyboard is needed instead of being
   shown a drill that cannot accept input.
+- `Ctrl+Enter` restarts the active drill: it closes the current session and
+  loads a fresh attempt. Tab remains ordinary focus navigation.
 - The text track colors by rhythm, not by mistakes: up to 400 ms is smooth,
   up to 900 ms steady, and beyond that hesitant.
 - Losing focus or pausing stops the clock. The first three keys after a pause are

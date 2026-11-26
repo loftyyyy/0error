@@ -49,6 +49,15 @@ describe('KeyboardGuide', () => {
     )
   })
 
+  it('swaps the lit key without a color transition', () => {
+    const markup = renderToStaticMarkup(
+      <KeyboardGuide character="f" hesitating visible />,
+    )
+
+    expect(markup).toContain('fill-stone-900')
+    expect(markup).not.toContain('transition-colors')
+  })
+
   it('names the finger for a plain letter', () => {
     const markup = renderToStaticMarkup(
       <KeyboardGuide character="f" hesitating visible />,

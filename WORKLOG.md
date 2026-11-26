@@ -9,9 +9,9 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  203 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 199 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 138 tests in 22 files, oxlint clean,
+  209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 205 pass, including the Postgres-backed acceptance tests.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 140 tests in 22 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Any unlocked tier can be practised from the result ladder. Unlocked names become quiet underlined buttons with an accessible "Practise Top row" label; locked names stay plain. Choosing one starts a three-drill attempt at that tier through the existing `tier` parameter, without changing the unlock state. An App test opens a two-tier ladder, clicks Top row, and proves three new tier-1 drill requests. |
+| `HEAD`    | UX pass. Active guide keys swap without the 300 ms color transition; the hesitation reveal stays. The drill surface gains `px-4 py-6 sm:px-8 sm:py-8`. `Ctrl+Enter` restarts the active drill by abandoning it and loading a fresh attempt; Tab stays focus navigation. Focus and Reach eyebrows use the same small tracking as Coach, minor section gaps tighten, and quiet actions share one margin. Generated or cached drills missing the requested pair are rejected in `DrillFocus`, `AiDrillCache`, and `DrillService`; the static targeted builder answers instead. Tests: no transition class, Ctrl+Enter abandon plus fresh set, focus matching, cache refusal, service fallback, HTTP `jk`. Frontend 140, backend 209. |
+| `fa283c2` | Generated drills that miss the requested focus pair or finger keys are rejected and replaced by the static targeted builder. |
+| `9b74356` | Any unlocked tier can be practised from the result ladder. |
 | `cbd7688` | Production deployment config: Vercel build/output, SPA rewrite, security and cache headers, plus the exact API and CORS origins in docs. |
 | `a63996a` | Recent drills can be filtered by tier, with All as the default and Show N more recalculated per filter. |
 | `24bedc5` | Client errors emit one `0error:client-error` event from window hooks and the ErrorBoundary; the footer shows the injected build version. |
@@ -102,6 +104,11 @@ commit `HEAD`; older rows keep their real hashes.
   query instead of three. `finger` works the same way and cannot be combined with
   `focus`. The issue, validation, and lock rules stay identical to an
   automatically focused drill.
+- **A focus drill must contain its focus.** `DrillFocus.matches` requires every
+  requested pair, or one key the requested finger owns. Generated output is
+  filtered before caching, checked again on take, and checked before serving;
+  otherwise the static targeted builder answers. The model can ignore a prompt,
+  but it cannot send an off-target drill.
 - **Resume returns a sequence and a cursor, not a replay.** `GET /sessions/active`
   answers `204` or the newest ACTIVE session with `nextSeq` one past the highest
   stored keystroke, `position` derived from the last KEY or BACKSPACE, the active

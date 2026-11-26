@@ -163,8 +163,8 @@ function App() {
     setAttempt((value) => value + 1)
   }
 
-  /** Close a resumed drill on the server, then start a clean attempt. */
-  const startOver = async () => {
+  /** Close the active drill on the server, then start a clean attempt. */
+  const restartActive = async () => {
     const current = drill
     if (!current) return
     await abandonServerSession(current.sessionId).catch(() => undefined)
@@ -257,7 +257,8 @@ function App() {
             <Drill
               drill={drill}
               scoring={phase === 'scoring'}
-              onStartOver={drill.resume ? () => void startOver() : undefined}
+              onStartOver={drill.resume ? () => void restartActive() : undefined}
+              onRestart={() => void restartActive()}
               onComplete={() => {
                 void score()
               }}
@@ -326,9 +327,10 @@ interface DrillProps {
   scoring: boolean
   onComplete: () => void
   onStartOver?: () => void
+  onRestart: () => void
 }
 
-function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
+function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProps) {
   const { containerRef, snapshot, notice } = useKeystrokeCapture({
     sessionId: drill.sessionId,
     text: drill.text,
@@ -348,6 +350,17 @@ function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
     containerRef.current?.focus({ preventScroll: true })
   }, [containerRef])
 
+  // Ctrl+Enter restarts; never during scoring, when completion is in flight.
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if (scoring || !event.ctrlKey || event.key !== 'Enter') return
+      event.preventDefault()
+      onRestart()
+    }
+    window.addEventListener('keydown', handle)
+    return () => window.removeEventListener('keydown', handle)
+  }, [scoring, onRestart])
+
   const descriptionId = `drill-text-${drill.sessionId}`
 
   const progress = snapshot.length === 0 ? 0 : (snapshot.index / snapshot.length) * 100
@@ -365,7 +378,7 @@ function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
       aria-label="Typing practice. Type the text shown."
       aria-describedby={descriptionId}
       tabIndex={0}
-      className="cursor-text rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-stone-300 dark:focus-visible:ring-stone-700"
+      className="cursor-text rounded-2xl px-4 py-6 outline-none focus-visible:ring-2 focus-visible:ring-stone-300 sm:px-8 sm:py-8 dark:focus-visible:ring-stone-700"
     >
       {/* The drawn text is split into per-character spans, so screen readers
           get the drill as one plain paragraph instead. */}
@@ -429,7 +442,7 @@ function Drill({ drill, scoring, onComplete, onStartOver }: DrillProps) {
         <button
           type="button"
           onClick={onStartOver}
-          className="mt-1 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+          className="mt-2 text-xs text-stone-400 underline underline-offset-2 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
         >
           Start over
         </button>
@@ -514,7 +527,7 @@ function ResultPanel({
         <Metric label="Keystrokes" value={String(result.metrics.keystrokeCount)} />
       </dl>
 
-      <p className="mt-5 text-xs text-stone-400 dark:text-stone-500">
+      <p className="mt-4 text-xs text-stone-400 dark:text-stone-500">
         {drill.tierName} gate: {result.accuracyThreshold}% accurate,{' '}
         {result.medianThresholdMs} ms median, {result.p95ThresholdMs} ms p95, at least{' '}
         {result.minimumKeystrokes} keys.
@@ -719,7 +732,7 @@ function RecentDrills({ tier }: { tier: number }) {
   const filters: Array<number | 'all'> = ['all', ...tiers.map(([value]) => value)]
 
   return (
-    <div className="mt-6 border-t border-stone-200 pt-4 dark:border-stone-800">
+    <div className="mt-4 border-t border-stone-200 pt-4 dark:border-stone-800">
       {trend ? (
         <p className="text-xs text-stone-400 dark:text-stone-500">{trend}</p>
       ) : null}
