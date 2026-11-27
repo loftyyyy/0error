@@ -134,6 +134,8 @@ DB_PORT=55432 ./mvnw spring-boot:run
 ```
 
 On Windows PowerShell, set `$env:POSTGRES_PORT='55432'` before `docker compose`.
+If startup says `role "0error" does not exist`, the backend reached a different
+Postgres on 5432. Move both compose and the backend to 55432 together.
 
 ## Configuration
 
