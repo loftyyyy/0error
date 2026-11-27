@@ -822,6 +822,39 @@ describe('App', () => {
     expect(document.activeElement).toBe(heading)
   })
 
+  it('wraps only at spaces and keeps the active character tracked', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+
+    const prompt = container?.querySelector('[data-testid="drill-text"]')
+    expect(prompt?.className).toContain('whitespace-pre-wrap')
+    expect(prompt?.className).toContain('break-words')
+    const spans = Array.from(prompt?.querySelectorAll('span') ?? [])
+    expect(spans).toHaveLength(DRILL_TEXT.length)
+    expect(spans[0].className).toContain('border-b-2')
+    // Spaces stay real spaces, so wrapping happens between words.
+    expect(spans[2].textContent).toBe(' ')
+
+    await press('f')
+    await waitFor(
+      () =>
+        (container?.querySelectorAll('[data-testid="drill-text"] span')[1]?.className ?? '')
+          .includes('border-b-2'),
+      'the next character to become current',
+    )
+    const after = Array.from(
+      container?.querySelectorAll('[data-testid="drill-text"] span') ?? [],
+    )
+    expect(after[1].className).toContain('border-b-2')
+    expect(after[0].className).toContain('text-amber-600')
+  })
+
+  it('hides the prompt scrollbar while keeping it scrollable', async () => {
+    await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
+    const scroller = container?.querySelector('[data-testid="drill-scroll"]')
+    expect(scroller?.className).toContain('overflow-y-auto')
+    expect(scroller?.className).toContain('scrollbar-hide')
+  })
+
   it('restarts the active drill with Ctrl+Enter', async () => {
     await waitFor(() => shownDrill() === DRILL_TEXT, 'the drill text')
     const before = calls.filter((call) => call.url.includes('/drills/next')).length

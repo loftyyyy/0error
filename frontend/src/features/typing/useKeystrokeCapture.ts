@@ -112,7 +112,6 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
   const snapshot = useSyncExternalStore(subscribe, getSnapshot)
 
   const [notice, setNotice] = useState<CaptureNotice>('none')
-
   const containerRef = useRef<HTMLDivElement | null>(null)
   const bufferRef = useRef<TelemetryBuffer | null>(null)
   const noticeTimerRef = useRef<number | null>(null)

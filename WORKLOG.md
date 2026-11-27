@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   210 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 206 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 141 tests in 21 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 143 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Resumed text keeps its colors. `GET /sessions/active` now returns `correctness`, one entry per text position: the last KEY result, null where nothing was typed. The engine seeds its correctness array, so prefix characters show amber for right and grey for wrong instead of all grey. Untyped positions stay quiet. Backend tests cover all-correct, mixed, and corrected-last-key positions; the resume App test asserts amber and grey spans. Backend 210, frontend 141. |
+| `HEAD`    | The prompt wraps correctly and scrolls without a visible bar. Spaces are real spaces under `whitespace-pre-wrap`, so lines break between words instead of through them; `overflow-wrap: break-word` handles a word wider than the box. The text sits in a bounded `overflow-y-auto scrollbar-hide` scroller, and the active span is kept inside the box after every index change. CSS hides the bar for Chrome/Safari, Firefox, and Edge. Tests assert real spaces, wrap classes, active-span tracking after a key, the scroller classes, and a 360px viewport with no horizontal overflow. Frontend 143 tests, Playwright 4. |
+| `c102409` | Resume restores amber and grey characters through per-position `correctness`. |
 | `633755f` | A `409` telemetry answer settles every queued batch for that closed session; completion then replays or shows the terminal copy. |
 | `983c542` | Completion drains only its own session, so another session's stuck batch cannot block it. |
 | `2065242` | Flushes are serialized and retry with short pauses, so a fast finish cannot lose its final tail. |
@@ -110,6 +111,10 @@ commit `HEAD`; older rows keep their real hashes.
   query instead of three. `finger` works the same way and cannot be combined with
   `focus`. The issue, validation, and lock rules stay identical to an
   automatically focused drill.
+- **The prompt wraps words, never characters.** Spaces are real spaces under
+  `white-space: pre-wrap`; a long word breaks only when no line can fit it. The
+  prompt scrolls inside a hidden-scrollbar box, and the active span is kept
+  visible after every key. This avoids forcing extra spaces at a visual break.
 - **Help is always on, feedback is correctness.** The guide lights the next key
   immediately and after every keystroke; there is no hesitation timer to tune.
   Typed characters show only whether they were right: amber for correct, grey

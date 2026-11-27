@@ -34,7 +34,9 @@ must contain it; generated text that ignores the target is discarded.
   loads a fresh attempt. Tab remains ordinary focus navigation.
 - The text track colors by correctness: a correctly typed character turns amber,
   a mistake stays grey, and the next expected character stays strong and
-  underlined.
+  underlined. Words wrap only at spaces; a long word breaks only when it cannot
+  fit. The prompt scrolls inside its own box with the scrollbar hidden, and the
+  current character stays in view.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
@@ -337,7 +339,8 @@ npm run test:e2e   # Playwright; starts Vite and the backend
 
 Playwright uses Chromium and expects the Postgres from `compose.yaml` on port
 55432. Its web server entries start Vite and `mvnw spring-boot:run` with AI
-disabled. The specs cover one full drill, reload resume, and "Start over".
+disabled. The specs cover one full drill, a synchronous key burst, a 360px
+viewport, reload resume, and "Start over".
 
 Most frontend tests are pure functions rendered to static markup. The `App` flow
 tests and the keystroke capture test run in jsdom and dispatch real `keydown`,

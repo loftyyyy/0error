@@ -27,6 +27,16 @@ body {
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
+/* The drill scrolls internally; its scrollbar is not part of the calm surface. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Motion is decoration; the drill never depends on an animation. */
 @media (prefers-reduced-motion: reduce) {
   *,

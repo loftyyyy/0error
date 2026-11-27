@@ -352,6 +352,23 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
     containerRef.current?.focus({ preventScroll: true })
   }, [containerRef])
 
+  const promptRef = useRef<HTMLDivElement | null>(null)
+  const activeRef = useRef<HTMLSpanElement | null>(null)
+
+  // Keep the character being typed inside the prompt scroller.
+  useEffect(() => {
+    const box = promptRef.current
+    const active = activeRef.current
+    if (!box || !active) return
+    const boxRect = box.getBoundingClientRect()
+    const activeRect = active.getBoundingClientRect()
+    if (activeRect.top < boxRect.top) {
+      box.scrollTop -= boxRect.top - activeRect.top + 8
+    } else if (activeRect.bottom > boxRect.bottom) {
+      box.scrollTop += activeRect.bottom - boxRect.bottom + 8
+    }
+  }, [snapshot.index])
+
   // Ctrl+Enter restarts; never during scoring, when completion is in flight.
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
@@ -383,24 +400,31 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
       <p id={descriptionId} className="sr-only">
         {drill.text}
       </p>
-      <p
-        aria-hidden="true"
-        data-testid="drill-text"
-        className="font-mono text-3xl leading-[1.9] tracking-wide break-words select-none sm:text-4xl"
+      <div
+        ref={promptRef}
+        data-testid="drill-scroll"
+        className="max-h-[55vh] overflow-y-auto scrollbar-hide"
       >
-        {drill.text.split('').map((character, index) => {
-          const state =
-            index < snapshot.index ? 'done' : index === snapshot.index ? 'current' : 'todo'
-          return (
-            <span
-              key={`${character}-${index}`}
-              className={characterClass(state, snapshot.correctness[index] ?? null)}
-            >
-              {character === ' ' ? '\u00a0' : character}
-            </span>
-          )
-        })}
-      </p>
+        <p
+          aria-hidden="true"
+          data-testid="drill-text"
+          className="font-mono text-3xl leading-[1.9] tracking-wide whitespace-pre-wrap break-words [word-break:normal] select-none sm:text-4xl"
+        >
+          {drill.text.split('').map((character, index) => {
+            const state =
+              index < snapshot.index ? 'done' : index === snapshot.index ? 'current' : 'todo'
+            return (
+              <span
+                key={`${character}-${index}`}
+                ref={index === snapshot.index ? activeRef : undefined}
+                className={characterClass(state, snapshot.correctness[index] ?? null)}
+              >
+                {character}
+              </span>
+            )
+          })}
+        </p>
+      </div>
 
       <div className="mt-12 h-px w-full bg-stone-200 dark:bg-stone-800">
         <div

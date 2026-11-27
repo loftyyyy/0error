@@ -50,6 +50,22 @@ test('a burst of keys in one task still scores', async ({ page }) => {
   await expect(page.getByText('The drill is not scored yet.')).toBeHidden()
 })
 
+test('keeps the prompt inside a 360px viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/')
+  await expect(page.locator(DRILL)).toBeVisible()
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
+  expect(overflow).toBeLessThanOrEqual(0)
+
+  const horizontal = await page
+    .locator(DRILL)
+    .evaluate((element) => element.scrollWidth - element.clientWidth)
+  expect(horizontal).toBeLessThanOrEqual(0)
+})
+
 test('a reload resumes the open drill and start over clears it', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator(DRILL)).toBeVisible()
