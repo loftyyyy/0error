@@ -22,7 +22,6 @@ import { APP_VERSION } from './lib/observability'
 import { KeyboardGuide } from './features/typing/KeyboardGuide'
 import { TouchNotice } from './features/typing/TouchNotice'
 import { characterClass } from './features/typing/characterClass'
-import { useHesitation } from './features/typing/useHesitation'
 import { useKeystrokeCapture } from './features/typing/useKeystrokeCapture'
 import { useTouchOnly } from './features/typing/useTouchOnly'
 import { ThemeToggle } from './features/theme/ThemeToggle'
@@ -267,9 +266,9 @@ function App() {
         ) : null}
 
         <footer className="mt-20 text-xs leading-relaxed text-stone-400 dark:text-stone-600">
-          Clean keys fade; a warm letter marks a pause. Telemetry queues locally until the API
-          acknowledges it. Focus loss pauses the clock. Three keystrokes after a pause are warmup
-          and never scored.
+          Correct keys turn amber; misses stay grey. The next key is always lit below.
+          Telemetry queues locally until the API acknowledges it. Focus loss pauses the
+          clock. Three keystrokes after a pause are warmup and never scored.
           <span className="ml-2 text-stone-300 dark:text-stone-700">v{APP_VERSION}</span>
         </footer>
       </div>
@@ -366,14 +365,6 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
   const progress = snapshot.length === 0 ? 0 : (snapshot.index / snapshot.length) * 100
   const isPaused = snapshot.status === 'paused'
   const isComplete = snapshot.status === 'complete'
-  const running = snapshot.status === 'running' && !scoring
-
-  // Each keystroke restarts the timer; only a real pause reveals the guide.
-  const { hesitating } = useHesitation(
-    snapshot.eventCount,
-    running,
-    snapshot.lastQuality,
-  )
 
   return (
     <div
@@ -400,7 +391,7 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
           return (
             <span
               key={`${character}-${index}`}
-              className={characterClass(state, snapshot.quality[index] ?? null)}
+              className={characterClass(state, snapshot.correctness[index] ?? null)}
             >
               {character === ' ' ? '\u00a0' : character}
             </span>
@@ -454,7 +445,6 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
 
       <KeyboardGuide
         character={drill.text[snapshot.index] ?? null}
-        hesitating={hesitating}
         visible={!scoring}
       />
     </div>

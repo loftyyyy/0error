@@ -31,10 +31,8 @@ describe('keyForCharacter', () => {
 })
 
 describe('KeyboardGuide', () => {
-  it('names the key, the shift, and the finger once a hesitation is shown', () => {
-    const markup = renderToStaticMarkup(
-      <KeyboardGuide character=":" hesitating visible />,
-    )
+  it('always lights the next key and names its finger and shift', () => {
+    const markup = renderToStaticMarkup(<KeyboardGuide character=":" visible />)
 
     expect(markup).toContain('Hold shift')
     expect(markup).toContain('Right pinky finger')
@@ -42,37 +40,21 @@ describe('KeyboardGuide', () => {
     expect(markup).toContain(
       'aria-label="Keyboard hint: press ; with your right pinky finger and Shift"',
     )
-    // The hint is also announced politely, not only drawn.
-    expect(markup).toContain('role="status"')
-    expect(markup).toContain(
-      '>Keyboard hint: press ; with your right pinky finger and Shift</p>',
-    )
-  })
-
-  it('swaps the lit key without a color transition', () => {
-    const markup = renderToStaticMarkup(
-      <KeyboardGuide character="f" hesitating visible />,
-    )
-
-    expect(markup).toContain('fill-stone-900')
     expect(markup).not.toContain('transition-colors')
   })
 
-  it('names the finger for a plain letter', () => {
-    const markup = renderToStaticMarkup(
-      <KeyboardGuide character="f" hesitating visible />,
-    )
+  it('names the finger for a plain letter immediately', () => {
+    const markup = renderToStaticMarkup(<KeyboardGuide character="f" visible />)
 
     expect(markup).toContain('Left index finger')
+    expect(markup).toContain('fill-stone-900')
     expect(markup).toContain(
       'aria-label="Keyboard hint: press f with your left index finger"',
     )
   })
 
   it('says thumbs for the space bar', () => {
-    const markup = renderToStaticMarkup(
-      <KeyboardGuide character=" " hesitating visible />,
-    )
+    const markup = renderToStaticMarkup(<KeyboardGuide character=" " visible />)
 
     expect(markup).toContain('Thumbs')
     expect(markup).toContain(
@@ -80,15 +62,12 @@ describe('KeyboardGuide', () => {
     )
   })
 
-  it('stays unlit and quiet while the rhythm holds', () => {
+  it('draws no lit key when there is no next character', () => {
     const markup = renderToStaticMarkup(
-      <KeyboardGuide character="a" hesitating={false} visible />,
+      <KeyboardGuide character={null} visible />,
     )
 
     expect(markup).not.toContain('fill-stone-900')
-    expect(markup).not.toMatch(/finger|Hold shift/)
     expect(markup).toContain('aria-label="Keyboard guide"')
-    // Nothing is announced when no hesitation is showing.
-    expect(markup).toContain('<p role="status" aria-live="polite" class="sr-only"></p>')
   })
 })

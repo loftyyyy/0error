@@ -25,17 +25,16 @@ must contain it; generated text that ignores the target is discarded.
 
 ## In the browser
 
-- The keyboard drawing reveals the next key after 0.9 s without input and
-  names the finger that reaches it. The wait shortens toward 0.65 s after
-  stumbling keys and eases back toward 1.2 s on smooth streaks. Once shown, the
-  key swaps without a color transition. Shifted symbols point at the base key
-  and add a Shift hint.
+- The keyboard drawing always lights the next expected key, from the first
+  character onward. It names the finger that reaches it, swaps with no color
+  transition, and points shifted symbols at the base key with a Shift hint.
 - A touch-only device is told a physical keyboard is needed instead of being
   shown a drill that cannot accept input.
 - `Ctrl+Enter` restarts the active drill: it closes the current session and
   loads a fresh attempt. Tab remains ordinary focus navigation.
-- The text track colors by rhythm, not by mistakes: up to 400 ms is smooth,
-  up to 900 ms steady, and beyond that hesitant.
+- The text track colors by correctness: a correctly typed character turns amber,
+  a mistake stays grey, and the next expected character stays strong and
+  underlined.
 - Losing focus or pausing stops the clock. The first three keys after a pause are
   warmup and never scored.
 - After a result, two quiet notes name the weakest transition and the least
@@ -51,8 +50,8 @@ must contain it; generated text that ignores the target is discarded.
   target is exercised without waiting for analysis to surface it again.
 - A reload asks the server for an open drill. When one exists it resumes at the
   stored cursor, telemetry sequence, key count, and accuracy, with three warmup
-  keys after the break. Earlier rhythm shading is not replayed; the progress bar
-  still shows position. A quiet "Start over" closes it on the server and loads a
+  keys after the break. Earlier typed-state colors are not replayed; the progress
+  bar still shows position. A quiet "Start over" closes it on the server and loads a
   fresh drill, so the abandoned one does not return.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after
@@ -88,7 +87,7 @@ must contain it; generated text that ignores the target is discarded.
 - Each drill takes focus when it appears and the target text is also exposed as
   a hidden plain paragraph, so a screen reader reads what to type while the
   colored, per-character drawing stays out of the announcement.
-- A hesitation hint is announced for screen readers, and the guide's fade plus
+- The guide's accessible label names the next key and finger, and its fade plus
   the coach cursor stop moving under `prefers-reduced-motion`.
 - Light and dark follow the operating system until the switch beside the tier
   name is pressed. That choice is remembered and applied before the first paint,
@@ -342,10 +341,10 @@ Playwright uses Chromium and expects the Postgres from `compose.yaml` on port
 disabled. The specs cover one full drill, reload resume, and "Start over".
 
 Most frontend tests are pure functions rendered to static markup. The `App` flow
-tests, the keystroke capture test, and the hesitation test run in jsdom and
-dispatch real `keydown`, `blur`, and `paste` events. `App.test.tsx` covers the
-happy loop, the raw events that reach the server, and a telemetry outage where
-the result is held back until the queued batch is retried.
+tests and the keystroke capture test run in jsdom and dispatch real `keydown`,
+`blur`, and `paste` events. `App.test.tsx` covers the happy loop, the raw events
+that reach the server, and a telemetry outage where the result is held back until
+the queued batch is retried.
 
 ## Project layout
 

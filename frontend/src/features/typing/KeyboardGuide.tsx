@@ -1,6 +1,6 @@
 /**
- * A quiet on-screen keyboard. It stays faint while the rhythm holds and lights
- * up the next key only after a hesitation, so it never competes with the text.
+ * A quiet on-screen keyboard. The next expected key is always lit, so the
+ * drawing answers immediately without waiting for a pause.
  */
 
 import { fingerForBase, fingerHint } from './fingerMap'
@@ -9,7 +9,6 @@ import { keyForCharacter, KEYBOARD_ROWS } from './keyboardLayout'
 export interface KeyboardGuideProps {
   /** The next character in the drill; null when the drill is over. */
   character: string | null
-  hesitating: boolean
   visible?: boolean
 }
 
@@ -25,11 +24,10 @@ const VIEW_HEIGHT = 214
 
 export function KeyboardGuide({
   character,
-  hesitating,
   visible = true,
 }: KeyboardGuideProps) {
   const target = keyForCharacter(character)
-  const highlight = hesitating ? target : null
+  const highlight = target
   const finger = highlight ? fingerForBase(highlight.base) : null
   const fingerLabel =
     finger === null ? null : finger === 'Thumbs' ? 'Thumbs' : `${finger} finger`
@@ -54,14 +52,10 @@ export function KeyboardGuide({
   return (
     <div
       className={`mt-12 flex flex-col items-center gap-2 transition-opacity duration-500 motion-reduce:transition-none ${
-        visible ? (hesitating ? 'opacity-100' : 'opacity-40') : 'opacity-0'
+        visible ? 'opacity-100' : 'opacity-0'
       }`}
       aria-hidden={visible ? undefined : 'true'}
     >
-      {/* The drawing is visual; this is what a screen reader announces. */}
-      <p role="status" aria-live="polite" className="sr-only">
-        {visible && hesitating && highlight ? label : ''}
-      </p>
       <svg
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         role="img"

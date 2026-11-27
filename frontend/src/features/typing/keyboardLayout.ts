@@ -10,9 +10,6 @@ export interface KeyboardTarget {
   shift: boolean
 }
 
-/** How long an idle pause may last before the guide offers help. */
-export { BASE_HINT_MS as HESITATION_HINT_MS } from './hintDelay'
-
 /** The keys drawn by the guide, in physical rows. */
 export const KEYBOARD_ROWS: ReadonlyArray<readonly string[]> = [
   '1234567890-='.split(''),

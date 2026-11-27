@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 205 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 148 tests in 23 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 135 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The guide delay now agrees with the amber trace: both use 900 ms. It also adapts to rhythm without onboarding. `nextHintDelay` starts at 900, drops 100 ms per hesitant key to a 650 ms floor, and rises 50 ms per smooth key to a 1200 ms ceiling. `TypingSnapshot.lastQuality` carries the last key's rhythm; the hook adjusts in render, so no extra effect or lint warning. Gestures: warmup, steady, and backspace do not move the delay. Tests cover the pure steps, clamping, the engine's last quality, and a shortened timer actually firing at 800 ms. Frontend 148 tests, backend 209. |
+| `HEAD`    | The guide is always on. It lights the next expected key from the first character and after every keystroke, with no hesitation timer or opacity gate. Correct typed characters stay amber, mistakes stay grey, and the current expected character keeps the strong underline. Removed `useHesitation`, `hintDelay`, `StrokeQuality`, `quality`, and `lastQuality`; the engine now exposes a `correctness` array. README and tests follow. Frontend 135 tests, backend 209. |
+| `76180a6` | The guide delay aligned with amber at 900 ms and adapted 650–1200 ms from rhythm. Superseded by the always-on guide. |
 | `9c5e4c9` | UX pass: instant guide key swap, Ctrl+Enter restart, drill padding, aligned eyebrows and quiet-action margins. |
 | `fa283c2` | Generated or cached drills missing the requested focus pair or finger keys fall back to the static targeted builder. |
 | `9b74356` | Any unlocked tier can be practised from the result ladder. |
@@ -105,11 +106,11 @@ commit `HEAD`; older rows keep their real hashes.
   query instead of three. `finger` works the same way and cannot be combined with
   `focus`. The issue, validation, and lock rules stay identical to an
   automatically focused drill.
-- **Help follows rhythm, not a profile.** The guide waits 900 ms by default,
-  shortens by 100 ms after a hesitant key toward 650 ms, and eases back by 50 ms
-  after a smooth key toward 1200 ms. Warmup, steady keys, and backspaces do not
-  move it. No onboarding question and no server change; the gate and adaptive
-  drills stay untouched.
+- **Help is always on, feedback is correctness.** The guide lights the next key
+  immediately and after every keystroke; there is no hesitation timer to tune.
+  Typed characters show only whether they were right: amber for correct, grey
+  for wrong. The current expected character keeps the strong underline. Rhythm
+  still reaches the server in telemetry, but it no longer changes the UI.
 - **A focus drill must contain its focus.** `DrillFocus.matches` requires every
   requested pair, or one key the requested finger owns. Generated output is
   filtered before caching, checked again on take, and checked before serving;

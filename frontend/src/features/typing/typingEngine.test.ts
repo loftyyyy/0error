@@ -104,17 +104,14 @@ describe('TypingEngine', () => {
     expect(engine.getSnapshot().status).toBe('complete')
   })
 
-  it('reports the rhythm of the last key for the adaptive hint', () => {
+  it('records correctness for each typed position', () => {
     const engine = new TypingEngine('asd', { now: () => 0 })
 
     engine.press('a', 100)
-    expect(engine.getSnapshot().lastQuality).toBe('smooth')
+    engine.press('x', 200)
+    engine.press('d', 300)
 
-    engine.press('s', 1_100)
-    expect(engine.getSnapshot().lastQuality).toBe('hesitant')
-
-    engine.press('Backspace', 1_200)
-    expect(engine.getSnapshot().lastQuality).toBeNull()
+    expect(engine.getSnapshot().correctness).toEqual([true, false, true])
   })
 
   it('keeps the first-attempt error when a character is corrected', () => {
@@ -189,41 +186,6 @@ describe('TypingEngine', () => {
     engine.press('f', hesitationAt + 100)
 
     expect(engine.hesitationCountValue).toBe(1)
-  })
-
-  it('shades each typed character by the gap before it', () => {
-    const clock = fakeClock()
-    const engine = new TypingEngine('asdf', { now: clock.now })
-
-    engine.press('a', 100)
-    engine.press('s', 300)
-    engine.press('d', 1_000)
-    engine.press('f', 2_500)
-
-    expect(engine.getSnapshot().quality).toEqual([
-      'smooth',
-      'smooth',
-      'steady',
-      'hesitant',
-    ])
-  })
-
-  it('leaves untyped positions unshaded and marks warmups', () => {
-    const clock = fakeClock()
-    const engine = new TypingEngine('asdfg', { now: clock.now })
-
-    engine.pause(0)
-    engine.resume(0)
-    engine.press('a', 100)
-    engine.press('s', 200)
-
-    expect(engine.getSnapshot().quality).toEqual([
-      'warmup',
-      'warmup',
-      null,
-      null,
-      null,
-    ])
   })
 
   it('ignores backspace at the start and modifier-style keys', () => {
