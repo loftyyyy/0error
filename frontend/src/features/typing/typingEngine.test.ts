@@ -104,6 +104,19 @@ describe('TypingEngine', () => {
     expect(engine.getSnapshot().status).toBe('complete')
   })
 
+  it('reports the rhythm of the last key for the adaptive hint', () => {
+    const engine = new TypingEngine('asd', { now: () => 0 })
+
+    engine.press('a', 100)
+    expect(engine.getSnapshot().lastQuality).toBe('smooth')
+
+    engine.press('s', 1_100)
+    expect(engine.getSnapshot().lastQuality).toBe('hesitant')
+
+    engine.press('Backspace', 1_200)
+    expect(engine.getSnapshot().lastQuality).toBeNull()
+  })
+
   it('keeps the first-attempt error when a character is corrected', () => {
     const clock = fakeClock()
     const engine = new TypingEngine('as', { now: clock.now })

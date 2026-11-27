@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 205 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 140 tests in 22 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 148 tests in 23 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,8 +22,9 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | UX pass. Active guide keys swap without the 300 ms color transition; the hesitation reveal stays. The drill surface gains `px-4 py-6 sm:px-8 sm:py-8`. `Ctrl+Enter` restarts the active drill by abandoning it and loading a fresh attempt; Tab stays focus navigation. Focus and Reach eyebrows use the same small tracking as Coach, minor section gaps tighten, and quiet actions share one margin. Generated or cached drills missing the requested pair are rejected in `DrillFocus`, `AiDrillCache`, and `DrillService`; the static targeted builder answers instead. Tests: no transition class, Ctrl+Enter abandon plus fresh set, focus matching, cache refusal, service fallback, HTTP `jk`. Frontend 140, backend 209. |
-| `fa283c2` | Generated drills that miss the requested focus pair or finger keys are rejected and replaced by the static targeted builder. |
+| `HEAD`    | The guide delay now agrees with the amber trace: both use 900 ms. It also adapts to rhythm without onboarding. `nextHintDelay` starts at 900, drops 100 ms per hesitant key to a 650 ms floor, and rises 50 ms per smooth key to a 1200 ms ceiling. `TypingSnapshot.lastQuality` carries the last key's rhythm; the hook adjusts in render, so no extra effect or lint warning. Gestures: warmup, steady, and backspace do not move the delay. Tests cover the pure steps, clamping, the engine's last quality, and a shortened timer actually firing at 800 ms. Frontend 148 tests, backend 209. |
+| `9c5e4c9` | UX pass: instant guide key swap, Ctrl+Enter restart, drill padding, aligned eyebrows and quiet-action margins. |
+| `fa283c2` | Generated or cached drills missing the requested focus pair or finger keys fall back to the static targeted builder. |
 | `9b74356` | Any unlocked tier can be practised from the result ladder. |
 | `cbd7688` | Production deployment config: Vercel build/output, SPA rewrite, security and cache headers, plus the exact API and CORS origins in docs. |
 | `a63996a` | Recent drills can be filtered by tier, with All as the default and Show N more recalculated per filter. |
@@ -104,6 +105,11 @@ commit `HEAD`; older rows keep their real hashes.
   query instead of three. `finger` works the same way and cannot be combined with
   `focus`. The issue, validation, and lock rules stay identical to an
   automatically focused drill.
+- **Help follows rhythm, not a profile.** The guide waits 900 ms by default,
+  shortens by 100 ms after a hesitant key toward 650 ms, and eases back by 50 ms
+  after a smooth key toward 1200 ms. Warmup, steady keys, and backspaces do not
+  move it. No onboarding question and no server change; the gate and adaptive
+  drills stay untouched.
 - **A focus drill must contain its focus.** `DrillFocus.matches` requires every
   requested pair, or one key the requested finger owns. Generated output is
   filtered before caching, checked again on take, and checked before serving;

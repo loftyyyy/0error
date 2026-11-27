@@ -25,9 +25,11 @@ must contain it; generated text that ignores the target is discarded.
 
 ## In the browser
 
-- The keyboard drawing reveals the next key only after 1.2 s without input and
-  names the finger that reaches it. Once shown, the key swaps without a color
-  transition. Shifted symbols point at the base key and add a Shift hint.
+- The keyboard drawing reveals the next key after 0.9 s without input and
+  names the finger that reaches it. The wait shortens toward 0.65 s after
+  stumbling keys and eases back toward 1.2 s on smooth streaks. Once shown, the
+  key swaps without a color transition. Shifted symbols point at the base key
+  and add a Shift hint.
 - A touch-only device is told a physical keyboard is needed instead of being
   shown a drill that cannot accept input.
 - `Ctrl+Enter` restarts the active drill: it closes the current session and

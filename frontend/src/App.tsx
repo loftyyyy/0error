@@ -369,7 +369,11 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
   const running = snapshot.status === 'running' && !scoring
 
   // Each keystroke restarts the timer; only a real pause reveals the guide.
-  const hesitating = useHesitation(snapshot.eventCount, running)
+  const { hesitating } = useHesitation(
+    snapshot.eventCount,
+    running,
+    snapshot.lastQuality,
+  )
 
   return (
     <div

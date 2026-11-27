@@ -11,7 +11,7 @@ export interface KeyboardTarget {
 }
 
 /** How long an idle pause may last before the guide offers help. */
-export const HESITATION_HINT_MS = 1_200
+export { BASE_HINT_MS as HESITATION_HINT_MS } from './hintDelay'
 
 /** The keys drawn by the guide, in physical rows. */
 export const KEYBOARD_ROWS: ReadonlyArray<readonly string[]> = [

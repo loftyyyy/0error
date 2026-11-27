@@ -46,6 +46,8 @@ export interface TypingSnapshot {
   elapsedMs: number
   /** One entry per drill character; null until that position is typed. */
   quality: readonly (StrokeQuality | null)[]
+  /** Rhythm of the most recent key; null after a backspace or before typing. */
+  lastQuality: StrokeQuality | null
 }
 
 export interface TypingEngineOptions {
@@ -103,6 +105,7 @@ export class TypingEngine {
   private hesitationCount = 0
   /** Rhythm per target position, so the text track can show pauses. */
   private readonly quality: (StrokeQuality | null)[]
+  private lastQuality: StrokeQuality | null = null
   /** Accuracy is first-attempt per position; corrections never erase an error. */
   private readonly scoredPositions = new Set<number>()
 
@@ -194,6 +197,7 @@ export class TypingEngine {
       this.position -= 1
       this.corrections += 1
       this.targetShownAt = t
+      this.lastQuality = null
       return this.emit({
         position: this.position,
         kind: 'BACKSPACE',
@@ -213,7 +217,9 @@ export class TypingEngine {
     const correct = key === expected
     const displayMs = Math.max(0, Math.round(t - this.targetShownAt))
     const gap = this.lastKeyAt === null ? displayMs : t - this.lastKeyAt
-    this.quality[this.position] = isWarmup ? 'warmup' : qualityFor(gap)
+    const strokeQuality: StrokeQuality = isWarmup ? 'warmup' : qualityFor(gap)
+    this.quality[this.position] = strokeQuality
+    this.lastQuality = strokeQuality
 
     if (isWarmup) {
       this.warmupRemaining -= 1
@@ -270,6 +276,7 @@ export class TypingEngine {
       eventCount: this.eventCount,
       elapsedMs: Math.round(this.elapsed(at)),
       quality: [...this.quality],
+      lastQuality: this.lastQuality,
     }
   }
 
