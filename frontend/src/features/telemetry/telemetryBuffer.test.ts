@@ -139,6 +139,57 @@ describe('flushSession', () => {
     expect(await countPendingBatches('session-2')).toBe(1)
   })
 
+  it('retries a transient upload before reporting failure', async () => {
+    let calls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1
+        return new Response('{}', { status: calls === 1 ? 503 : 200 })
+      }),
+    )
+
+    const { enqueueBatch } = await import('./keystrokeQueue')
+    const { flushSession } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-transient',
+      sessionId: 'session-transient',
+      createdAt: 1,
+      events,
+    })
+
+    await expect(flushSession('session-transient', '', 2)).resolves.toBe(true)
+    expect(calls).toBe(2)
+  })
+
+  it('flushes a final tail added while an earlier flush is running', async () => {
+    const sent: number[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          events?: { seq: number }[]
+        }
+        for (const event of body.events ?? []) sent.push(event.seq)
+        return new Response('{}', { status: 200 })
+      }),
+    )
+
+    const { countPendingBatches } = await import('./keystrokeQueue')
+    const { TelemetryBuffer } = await import('./telemetryBuffer')
+    const buffer = new TelemetryBuffer('session-fast', '')
+
+    buffer.push([events[0]])
+    const first = buffer.flush()
+    buffer.push([{ ...events[0], seq: 1 }])
+    const second = buffer.flush()
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+    expect(sent.sort()).toEqual([0, 1])
+    expect(await countPendingBatches('session-fast')).toBe(0)
+  })
+
   it('drops a batch for a session the server has already closed', async () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 409 }))
     vi.stubGlobal('fetch', fetchMock)

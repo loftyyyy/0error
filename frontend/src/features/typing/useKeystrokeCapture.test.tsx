@@ -79,6 +79,16 @@ async function settle() {
   })
 }
 
+async function waitFor(check: () => boolean, label: string) {
+  const deadline = Date.now() + 3_000
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}`)
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+  }
+}
+
 async function press(key: string, init: KeyboardEventInit = {}) {
   const event = new KeyboardEvent('keydown', { key, cancelable: true, ...init })
   await act(async () => {
@@ -223,7 +233,7 @@ describe('useKeystrokeCapture', () => {
 
     await press('a')
     await press('b')
-    await settle()
+    await waitFor(() => onComplete.mock.calls.length === 1, 'the completed drill')
 
     expect(captureNow().snapshot.status).toBe('complete')
     expect(fetchMock).toHaveBeenCalled()

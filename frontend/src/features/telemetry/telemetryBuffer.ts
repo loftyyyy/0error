@@ -141,6 +141,10 @@ export async function flushSession(
   attempts = 3,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) {
+      // A fast burst can briefly outrun the ingest; give it a moment.
+      await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
+    }
     await drainOutbox(apiBase)
     if ((await countPendingBatches(sessionId)) === 0) return true
   }
@@ -157,6 +161,7 @@ export class TelemetryBuffer {
   private pending: KeystrokeEvent[] = []
   private timer: ReturnType<typeof setInterval> | null = null
   private onlineHandler: (() => void) | null = null
+  private chain: Promise<boolean> = Promise.resolve(true)
 
   constructor(sessionId: string, apiBase = API_BASE) {
     this.sessionId = sessionId
@@ -189,7 +194,20 @@ export class TelemetryBuffer {
     }
   }
 
-  async flush(): Promise<boolean> {
+  /**
+   * Flushes run one after another. A fast drill can cross the batch threshold
+   * while the final key is still queuing, so completion waits behind that work
+   * and then flushes its own pending tail.
+   */
+  flush(): Promise<boolean> {
+    const run = this.chain
+      .catch(() => false)
+      .then(() => this.runFlush())
+    this.chain = run
+    return run
+  }
+
+  private async runFlush(): Promise<boolean> {
     while (this.pending.length > 0) {
       const events = this.pending.splice(0, BATCH_SIZE)
       await enqueueBatch({
