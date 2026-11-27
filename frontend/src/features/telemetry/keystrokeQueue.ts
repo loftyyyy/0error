@@ -141,6 +141,33 @@ export async function readOldestBatchForSession(
   )
 }
 
+/** Removes every batch for a session the server has already closed. */
+export async function deleteBatchesForSession(sessionId: string): Promise<void> {
+  const all = await readBatchesForSession(sessionId)
+  for (const entry of all) {
+    if (entry.id !== undefined) await deleteBatch(entry.id)
+  }
+}
+
+async function readBatchesForSession(sessionId: string): Promise<KeystrokeBatch[]> {
+  if (!memoryMode) {
+    try {
+      const db = await openDb()
+      const transaction = db.transaction(STORE, 'readonly')
+      const store = transaction.objectStore(STORE)
+      const batches = await requestToPromise(
+        store.index('sessionId').getAll(sessionId) as IDBRequest<KeystrokeBatch[]>,
+      )
+      await transactionDone(transaction)
+      return batches
+    } catch {
+      memoryMode = true
+    }
+  }
+
+  return memoryBatches.filter((candidate) => candidate.sessionId === sessionId)
+}
+
 export async function deleteBatch(id: number): Promise<void> {
   if (!memoryMode) {
     try {

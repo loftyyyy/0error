@@ -222,6 +222,37 @@ describe('flushSession', () => {
     expect(await countPendingBatches('stuck-session')).toBe(1)
   })
 
+  it('settles every batch once the server says the session is closed', async () => {
+    let calls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1
+        if (calls === 1) return new Response('{}', { status: 409 })
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    const { enqueueBatch, countPendingBatches } = await import('./keystrokeQueue')
+    const { flushSession } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-closed-1',
+      sessionId: 'session-closed-all',
+      createdAt: 1,
+      events,
+    })
+    await enqueueBatch({
+      batchId: 'batch-closed-2',
+      sessionId: 'session-closed-all',
+      createdAt: 2,
+      events,
+    })
+
+    await expect(flushSession('session-closed-all', '', 1)).resolves.toBe(true)
+    expect(await countPendingBatches('session-closed-all')).toBe(0)
+  })
+
   it('drops a batch for a session the server has already closed', async () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 409 }))
     vi.stubGlobal('fetch', fetchMock)

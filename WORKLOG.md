@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 205 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 138 tests in 21 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 139 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Fast finish still failed because `flushSession` drained the global outbox head. One retryable batch from an older session blocked every later session, so Try again kept hitting the same head. `readOldestBatchForSession` and a per-session drain now upload only the completing session; the global interval drain stays for background sync. Each drain has its own single-flight key, so the two never share a stalled promise. Tests: a stuck session does not block a healthy one, plus a synchronous 150-key burst in Playwright. Frontend 138 tests, Playwright 3. |
+| `HEAD`    | The console showed `409` on telemetry. That means the session was already closed, usually completed by an earlier response the client did not receive. The queue used to delete one 409 batch and then try the rest, which could still end in "keystrokes have not reached". A 409 now marks the session closed, drops every batch for it, and `flushSession` treats it as settled. Completion then calls the replay endpoint: a completed session returns its stored result instead of looping on telemetry. Tests cover a second batch that would otherwise fail after the 409. Frontend 139 tests, Playwright 3. |
+| `983c542` | Completion drains only its own session, so another session's stuck batch cannot block it. |
 | `2065242` | Flushes are serialized and retry with short pauses, so a fast finish cannot lose its final tail. |
 | `9618926` | The guide always lights the next key; characters color by correctness: amber for right, grey for wrong. |
 | `76180a6` | The guide delay aligned with amber at 900 ms and adapted 650–1200 ms from rhythm. Superseded. |
@@ -148,8 +149,8 @@ commit `HEAD`; older rows keep their real hashes.
   anything that is not `ACTIVE`, so a swept session can never be scored late.
 - **Closed sessions take no more telemetry.** Ingest answers `409` once a
   session leaves `ACTIVE`, which keeps stored aggregates identical to the ones
-  the gate judged. A `409` on a telemetry batch means "done", not "retry", so
-  the outbox drops it.
+  the gate judged. One `409` now settles every queued batch for that session;
+  completion then replays the stored answer instead of retrying dead keystrokes.
 - **Completion drains its own session, never the global queue head.** One old
   retryable batch must not block a new drill's completion. Background sync still
   drains everything; `flushSession` uses a per-session reader and its own

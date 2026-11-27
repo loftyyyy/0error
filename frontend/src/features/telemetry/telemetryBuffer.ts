@@ -4,6 +4,7 @@ import { GUEST_TOKEN_KEY, readGuestToken } from '../identity/guestSession'
 import {
   countPendingBatches,
   deleteBatch,
+  deleteBatchesForSession,
   enqueueBatch,
   markBatchAttempt,
   readOldestBatch,
@@ -25,7 +26,10 @@ function newBatchId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-type PostResult = 'ok' | 'retry' | 'offline' | 'drop'
+type PostResult = 'ok' | 'retry' | 'offline' | 'drop' | 'closed'
+
+/** Sessions the server has already closed; no later keystroke can be accepted. */
+const closedSessions = new Set<string>()
 
 /** How much of the keystroke queue has reached the server. */
 export type SyncState = 'synced' | 'pending' | 'offline'
@@ -79,7 +83,8 @@ async function postBatch(batch: KeystrokeBatch, apiBase: string): Promise<PostRe
     return 'offline'
   }
 
-  if (response.ok || response.status === 409) return 'ok'
+  if (response.ok) return 'ok'
+  if (response.status === 409) return 'closed'
   if (response.status === 408 || response.status === 425 || response.status === 429) return 'retry'
   if (response.status >= 500) return 'retry'
   if (response.status === 401 || response.status === 403) return 'retry'
@@ -108,6 +113,11 @@ function drainUntilStopped(
         }
 
         const result = await postBatch(batch, apiBase)
+        if (result === 'closed') {
+          closedSessions.add(batch.sessionId)
+          await deleteBatchesForSession(batch.sessionId)
+          return
+        }
         if (result === 'offline') {
           await markBatchAttempt(batch.id)
           setSyncState('offline')
@@ -166,6 +176,7 @@ export async function flushSession(
       await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
     }
     await drainSession(sessionId, apiBase)
+    if (closedSessions.has(sessionId)) return true
     if ((await countPendingBatches(sessionId)) === 0) return true
   }
   return false
