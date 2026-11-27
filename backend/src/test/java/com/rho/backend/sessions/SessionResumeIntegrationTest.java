@@ -70,6 +70,8 @@ class SessionResumeIntegrationTest {
 			assertThat(active.typedCount()).isEqualTo(3);
 			assertThat(active.scoredCount()).isEqualTo(3);
 			assertThat(active.correctCount()).isEqualTo(3);
+			assertThat(active.correctness().subList(0, 3))
+					.containsExactly(true, true, true);
 		}
 		finally {
 			deleteUser(guest.guestId());
@@ -99,6 +101,35 @@ class SessionResumeIntegrationTest {
 			assertThat(active.typedCount()).isEqualTo(2);
 			assertThat(active.scoredCount()).isEqualTo(2);
 			assertThat(active.correctCount()).isEqualTo(1);
+			assertThat(active.correctness().subList(0, 2))
+					.containsExactly(true, false);
+		}
+		finally {
+			deleteUser(guest.guestId());
+		}
+	}
+
+	@Test
+	void correctnessReflectsTheLastKeyAtEachPosition() {
+		GuestTokenResponse guest = guest();
+		UUID sessionId = UUID.randomUUID();
+		insertActive(guest.guestId(), sessionId);
+
+		try {
+			insertEvent(sessionId, 0, 0, "KEY", false);
+			insertEvent(sessionId, 1, 0, "KEY", true);
+
+			ActiveSessionResponse active = client.get()
+					.uri("/api/v1/sessions/active")
+					.headers(headers -> headers.setBearerAuth(guest.token()))
+					.exchange()
+					.expectStatus().isOk()
+					.expectBody(ActiveSessionResponse.class)
+					.returnResult()
+					.getResponseBody();
+
+			assertThat(active).isNotNull();
+			assertThat(active.correctness().get(0)).isTrue();
 		}
 		finally {
 			deleteUser(guest.guestId());

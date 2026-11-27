@@ -28,6 +28,7 @@ const active: ActiveSession = {
   typedCount: 3,
   scoredCount: 3,
   correctCount: 2,
+  correctness: [true, false, true, null, null, null, null, null],
 }
 
 const progress = {
@@ -197,6 +198,12 @@ describe('resume after reload', () => {
     expect(bodyText()).toContain('Picked up where you left off.')
     expect(bodyText()).toContain('67% accurate')
     expect(bodyText()).toContain('3 keys')
+    const spans = Array.from(
+      container?.querySelectorAll('[data-testid="drill-text"] span') ?? [],
+    )
+    expect(spans[0].className).toContain('text-amber-600')
+    expect(spans[1].className).toContain('text-stone-500')
+    expect(spans[2].className).toContain('text-amber-600')
     expect(calls.some((call) => call.url.includes('/drills/next'))).toBe(false)
     expect(
       calls.some((call) => call.url.endsWith('/api/v1/sessions') && call.method === 'POST'),

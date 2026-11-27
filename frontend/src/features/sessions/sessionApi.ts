@@ -130,6 +130,8 @@ export interface ActiveSession {
   typedCount: number
   scoredCount: number
   correctCount: number
+  /** Last key result per text position; null where nothing was typed. */
+  correctness: (boolean | null)[]
 }
 
 function isCount(value: unknown): value is number {
@@ -170,6 +172,14 @@ export async function fetchActiveSession(): Promise<ActiveSession | null> {
     !isCount(body.correctCount) ||
     body.correctCount > body.scoredCount ||
     body.scoredCount > body.typedCount
+  ) {
+    throw new Error('The resume response was invalid')
+  }
+  const correctness = body.correctness
+  if (
+    !Array.isArray(correctness) ||
+    correctness.length !== body.text.length ||
+    !correctness.every((value) => value === null || typeof value === 'boolean')
   ) {
     throw new Error('The resume response was invalid')
   }

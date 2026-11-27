@@ -9,9 +9,9 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 205 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 139 tests in 21 files, oxlint clean,
+  210 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 206 pass, including the Postgres-backed acceptance tests.
+- Frontend: React 19 / Vite 8 / Tailwind 4. 141 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The console showed `409` on telemetry. That means the session was already closed, usually completed by an earlier response the client did not receive. The queue used to delete one 409 batch and then try the rest, which could still end in "keystrokes have not reached". A 409 now marks the session closed, drops every batch for it, and `flushSession` treats it as settled. Completion then calls the replay endpoint: a completed session returns its stored result instead of looping on telemetry. Tests cover a second batch that would otherwise fail after the 409. Frontend 139 tests, Playwright 3. |
+| `HEAD`    | Resumed text keeps its colors. `GET /sessions/active` now returns `correctness`, one entry per text position: the last KEY result, null where nothing was typed. The engine seeds its correctness array, so prefix characters show amber for right and grey for wrong instead of all grey. Untyped positions stay quiet. Backend tests cover all-correct, mixed, and corrected-last-key positions; the resume App test asserts amber and grey spans. Backend 210, frontend 141. |
+| `633755f` | A `409` telemetry answer settles every queued batch for that closed session; completion then replays or shows the terminal copy. |
 | `983c542` | Completion drains only its own session, so another session's stuck batch cannot block it. |
 | `2065242` | Flushes are serialized and retry with short pauses, so a fast finish cannot lose its final tail. |
 | `9618926` | The guide always lights the next key; characters color by correctness: amber for right, grey for wrong. |
@@ -122,11 +123,10 @@ commit `HEAD`; older rows keep their real hashes.
 - **Resume returns a sequence and a cursor, not a replay.** `GET /sessions/active`
   answers `204` or the newest ACTIVE session with `nextSeq` one past the highest
   stored keystroke, `position` derived from the last KEY or BACKSPACE, the active
-  clock, and the stored typed/scored/correct counts. A reloaded tab appends
-  instead of colliding, starts at the stored index, and keeps the accuracy the
-  server will score. Earlier rhythm shading is not rebuilt; the progress bar
-  carries the position. Only the owner sees it; completed attempts and other
-  guests are invisible.
+  clock, the stored typed/scored/correct counts, and one last-key correctness
+  entry per text position. A reloaded tab appends instead of colliding, starts at
+  the stored index, and keeps both accuracy and amber/grey characters. Only the
+  owner sees it; completed attempts and other guests are invisible.
 - **Closing is explicit, not deletion.** "Start over" marks the owner's ACTIVE
   session `ABANDONED` with the real end time; the row and its aggregates stay.
   Telemetry for it is refused afterwards, and the resume check stops returning it.

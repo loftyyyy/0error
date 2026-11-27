@@ -1,5 +1,8 @@
 package com.rho.backend.sessions;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +49,13 @@ public class SessionResumeService {
 			        WHERE is_correct) AS correct_count
 			""";
 
+	private static final String CORRECTNESS = """
+			SELECT DISTINCT ON (position) position, is_correct
+			FROM keystroke_events
+			WHERE session_id = :sessionId AND kind = 'KEY'
+			ORDER BY position, seq DESC
+			""";
+
 	private final TypingSessionRepository sessions;
 	private final TierCatalogue catalogue;
 	private final DatabaseClient databaseClient;
@@ -61,22 +71,50 @@ public class SessionResumeService {
 
 	public Mono<Optional<ActiveSessionResponse>> find(UUID userId) {
 		return sessions.findFirstByUserIdAndStatusOrderByStartedAtDesc(userId, "ACTIVE")
-				.flatMap(session -> sequence(session.id())
-						.map(position -> Optional.of(new ActiveSessionResponse(
+				.flatMap(session -> Mono.zip(
+								sequence(session.id()),
+								correctness(session.id(), session.drillText()))
+						.map(state -> Optional.of(new ActiveSessionResponse(
 								session.id(),
 								session.tier(),
 								catalogue.require(session.tier()).name(),
 								session.drillText(),
 								session.allowedCharset(),
 								session.startedAt(),
-								position.nextSeq(),
-								position.total(),
-								position.cursor(),
-								position.elapsedMs(),
-								position.typed(),
-								position.scored(),
-								position.correct()))))
+								state.getT1().nextSeq(),
+								state.getT1().total(),
+								state.getT1().cursor(),
+								state.getT1().elapsedMs(),
+								state.getT1().typed(),
+								state.getT1().scored(),
+								state.getT1().correct(),
+								state.getT2()))))
 				.defaultIfEmpty(Optional.empty());
+	}
+
+	private Mono<List<Boolean>> correctness(UUID sessionId, String drillText) {
+		int length = drillText == null ? 0 : drillText.length();
+		return databaseClient.sql(CORRECTNESS)
+				.bind("sessionId", sessionId)
+				.map((row, metadata) -> new PositionResult(
+						row.get("position", Integer.class),
+						row.get("is_correct", Boolean.class)))
+				.all()
+				.reduce(new ArrayList<Boolean>(emptySlots(length)), (slots, result) -> {
+					if (result.position() >= 0 && result.position() < slots.size()) {
+						slots.set(result.position(), result.correct());
+					}
+					return slots;
+				})
+				.map(Collections::unmodifiableList);
+	}
+
+	private static List<Boolean> emptySlots(int length) {
+		List<Boolean> slots = new ArrayList<>(length);
+		for (int index = 0; index < length; index += 1) {
+			slots.add(null);
+		}
+		return slots;
 	}
 
 	private Mono<Sequence> sequence(UUID sessionId) {
@@ -99,6 +137,9 @@ public class SessionResumeService {
 							row.get("correct_count", Integer.class));
 				})
 				.one();
+	}
+
+	private record PositionResult(int position, boolean correct) {
 	}
 
 	private record Sequence(

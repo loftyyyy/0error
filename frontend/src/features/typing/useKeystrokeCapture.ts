@@ -20,6 +20,7 @@ export interface UseKeystrokeCaptureOptions {
   initialTyped?: number
   initialScored?: number
   initialCorrect?: number
+  initialCorrectness?: readonly (boolean | null)[]
   warmupOnStart?: boolean
   onComplete?: (snapshot: TypingSnapshot) => void
 }
@@ -68,6 +69,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
     initialTyped,
     initialScored,
     initialCorrect,
+    initialCorrectness,
     warmupOnStart,
     onComplete,
   } = options
@@ -84,6 +86,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
         initialTyped,
         initialScored,
         initialCorrect,
+        initialCorrectness,
         warmupOnStart,
       }),
     [
@@ -96,6 +99,7 @@ export function useKeystrokeCapture(options: UseKeystrokeCaptureOptions): Keystr
       initialTyped,
       initialScored,
       initialCorrect,
+      initialCorrectness,
       warmupOnStart,
     ],
   )

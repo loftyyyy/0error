@@ -48,6 +48,7 @@ interface ActiveDrill {
     typed: number
     scored: number
     correct: number
+    correctness: readonly (boolean | null)[]
   }
 }
 
@@ -102,6 +103,7 @@ function App() {
               typed: active.typedCount,
               scored: active.scoredCount,
               correct: active.correctCount,
+              correctness: active.correctness,
             },
           })
           setPhase('ready')
@@ -340,6 +342,7 @@ function Drill({ drill, scoring, onComplete, onStartOver, onRestart }: DrillProp
     initialTyped: drill.resume?.typed,
     initialScored: drill.resume?.scored,
     initialCorrect: drill.resume?.correct,
+    initialCorrectness: drill.resume?.correctness,
     warmupOnStart: Boolean(drill.resume),
   })
 

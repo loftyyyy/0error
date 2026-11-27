@@ -59,6 +59,8 @@ export interface TypingEngineOptions {
   initialScored?: number
   /** Correct first attempts already stored. */
   initialCorrect?: number
+  /** Last key result per text position, when resuming. */
+  initialCorrectness?: readonly (boolean | null)[]
   /** The first keys after a reload are warmup. */
   warmupOnStart?: boolean
 }
@@ -129,6 +131,12 @@ export class TypingEngine {
       this.scoredPositions.add(index)
     }
     this.correctness = new Array(text.length).fill(null)
+    const restored = options.initialCorrectness
+    if (restored) {
+      for (let index = 0; index < Math.min(restored.length, text.length); index += 1) {
+        this.correctness[index] = restored[index] ?? null
+      }
+    }
   }
 
   get isComplete(): boolean {

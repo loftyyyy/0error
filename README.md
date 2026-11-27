@@ -49,9 +49,8 @@ must contain it; generated text that ignores the target is discarded.
   starts a fresh attempt with that weakness sent to the server, so the same
   target is exercised without waiting for analysis to surface it again.
 - A reload asks the server for an open drill. When one exists it resumes at the
-  stored cursor, telemetry sequence, key count, and accuracy, with three warmup
-  keys after the break. Earlier typed-state colors are not replayed; the progress
-  bar still shows position. A quiet "Start over" closes it on the server and loads a
+  stored cursor, telemetry sequence, key count, accuracy, and per-character
+  correctness, with three warmup keys after the break. A quiet "Start over" closes it on the server and loads a
   fresh drill, so the abandoned one does not return.
 - A short tier ladder follows the result: every tier, the one just practised
   marked, and the next locked tier's effective median, p95, and any easing after

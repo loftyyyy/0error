@@ -94,6 +94,20 @@ describe('TypingEngine', () => {
     })
   })
 
+  it('seeds the displayed correctness after a reload', () => {
+    const engine = new TypingEngine('asdf', {
+      initialPosition: 3,
+      initialCorrectness: [true, false, true, null],
+    })
+
+    expect(engine.getSnapshot().correctness).toEqual([
+      true,
+      false,
+      true,
+      null,
+    ])
+  })
+
   it('rejects a stored cursor outside the drill', () => {
     const engine = new TypingEngine('as', {
       initialPosition: 9,
