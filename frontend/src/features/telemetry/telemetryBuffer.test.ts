@@ -190,6 +190,38 @@ describe('flushSession', () => {
     expect(await countPendingBatches('session-fast')).toBe(0)
   })
 
+  it('flushes one session even when another session batch is stuck', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL | Request) => {
+        const session = String(url)
+        return new Response('{}', {
+          status: session.includes('stuck-session') ? 503 : 200,
+        })
+      }),
+    )
+
+    const { enqueueBatch, countPendingBatches } = await import('./keystrokeQueue')
+    const { flushSession } = await import('./telemetryBuffer')
+
+    await enqueueBatch({
+      batchId: 'batch-stuck',
+      sessionId: 'stuck-session',
+      createdAt: 1,
+      events,
+    })
+    await enqueueBatch({
+      batchId: 'batch-current',
+      sessionId: 'current-session',
+      createdAt: 2,
+      events,
+    })
+
+    await expect(flushSession('current-session', '', 1)).resolves.toBe(true)
+    expect(await countPendingBatches('current-session')).toBe(0)
+    expect(await countPendingBatches('stuck-session')).toBe(1)
+  })
+
   it('drops a batch for a session the server has already closed', async () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 409 }))
     vi.stubGlobal('fetch', fetchMock)

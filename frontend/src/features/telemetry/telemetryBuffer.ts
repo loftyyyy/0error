@@ -7,6 +7,7 @@ import {
   enqueueBatch,
   markBatchAttempt,
   readOldestBatch,
+  readOldestBatchForSession,
 } from './keystrokeQueue'
 import type { KeystrokeBatch } from './keystrokeQueue'
 
@@ -87,16 +88,20 @@ async function postBatch(batch: KeystrokeBatch, apiBase: string): Promise<PostRe
   return 'drop'
 }
 
-let activeDrain: Promise<void> | null = null
+const activeDrains = new Map<string, Promise<void>>()
 
-/** Uploads queued batches oldest-first. Safe to call concurrently; one drain runs. */
-export function drainOutbox(apiBase = API_BASE): Promise<void> {
-  if (activeDrain) return activeDrain
+function drainUntilStopped(
+  key: string,
+  readNext: () => Promise<KeystrokeBatch | null>,
+  apiBase: string,
+): Promise<void> {
+  const existing = activeDrains.get(key)
+  if (existing) return existing
 
-  activeDrain = (async () => {
+  const drain = (async () => {
     try {
       for (let sent = 0; sent < MAX_BATCHES_PER_DRAIN; sent += 1) {
-        const batch = await readOldestBatch()
+        const batch = await readNext()
         if (!batch || batch.id === undefined) {
           setSyncState('synced')
           return
@@ -123,11 +128,26 @@ export function drainOutbox(apiBase = API_BASE): Promise<void> {
       // The queue may still hold work after one bounded drain.
       setSyncState('pending')
     } finally {
-      activeDrain = null
+      activeDrains.delete(key)
     }
   })()
 
-  return activeDrain
+  activeDrains.set(key, drain)
+  return drain
+}
+
+/** Uploads queued batches oldest-first. Safe to call concurrently; one drain runs. */
+export function drainOutbox(apiBase = API_BASE): Promise<void> {
+  return drainUntilStopped('all', readOldestBatch, apiBase)
+}
+
+/** Drains one session only, so another session's stuck batch cannot block it. */
+export function drainSession(sessionId: string, apiBase = API_BASE): Promise<void> {
+  return drainUntilStopped(
+    `session:${sessionId}`,
+    () => readOldestBatchForSession(sessionId),
+    apiBase,
+  )
 }
 
 /**
@@ -145,7 +165,7 @@ export async function flushSession(
       // A fast burst can briefly outrun the ingest; give it a moment.
       await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
     }
-    await drainOutbox(apiBase)
+    await drainSession(sessionId, apiBase)
     if ((await countPendingBatches(sessionId)) === 0) return true
   }
   return false

@@ -26,6 +26,30 @@ test('a guest finishes one drill through the browser', async ({ page }) => {
   await expect(page.getByText('Recent drills')).toBeVisible({ timeout: 10_000 })
 })
 
+test('a burst of keys in one task still scores', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator(DRILL)).toBeVisible()
+  const text = await drillText(page)
+
+  await page.locator(DRILL).click()
+  await page.evaluate((drill) => {
+    for (const character of drill) {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: character === ' ' ? ' ' : character,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    }
+  }, text)
+
+  await expect(
+    page.getByRole('heading', { name: /Gate passed\.|Not yet\./ }),
+  ).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('The drill is not scored yet.')).toBeHidden()
+})
+
 test('a reload resumes the open drill and start over clears it', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator(DRILL)).toBeVisible()

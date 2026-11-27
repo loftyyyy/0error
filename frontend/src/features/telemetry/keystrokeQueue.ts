@@ -114,6 +114,33 @@ export async function readOldestBatch(): Promise<KeystrokeBatch | null> {
   return memoryBatches[0] ?? null
 }
 
+/** Oldest batch for one session, so another session cannot block completion. */
+export async function readOldestBatchForSession(
+  sessionId: string,
+): Promise<KeystrokeBatch | null> {
+  if (!memoryMode) {
+    try {
+      const db = await openDb()
+      const transaction = db.transaction(STORE, 'readonly')
+      const store = transaction.objectStore(STORE)
+      const batches = await requestToPromise(
+        store.index('sessionId').getAll(sessionId) as IDBRequest<KeystrokeBatch[]>,
+      )
+      await transactionDone(transaction)
+      batches.sort((left, right) => left.createdAt - right.createdAt)
+      return batches[0] ?? null
+    } catch {
+      memoryMode = true
+    }
+  }
+
+  return (
+    memoryBatches
+      .filter((batch) => batch.sessionId === sessionId)
+      .sort((left, right) => left.createdAt - right.createdAt)[0] ?? null
+  )
+}
+
 export async function deleteBatch(id: number): Promise<void> {
   if (!memoryMode) {
     try {

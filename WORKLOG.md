@@ -11,7 +11,7 @@ commit `HEAD`; older rows keep their real hashes.
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
   209 tests, of which the 4 live-AI tests are gated and skipped without keys; the
   other 205 pass, including the Postgres-backed acceptance tests.
-- Frontend: React 19 / Vite 8 / Tailwind 4. 137 tests in 21 files, oxlint clean,
+- Frontend: React 19 / Vite 8 / Tailwind 4. 138 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
 - AI is optional and provider-agnostic: without `AI_API_KEY` drills come from the
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | Fixed fast-finish scoring. A fast drill can cross the 100-key batch threshold while the last key is still queuing; two flushes could then split on the same pending list, and completion could see an inconsistent outbox. `TelemetryBuffer.flush` now chains calls so the completion flush waits behind any active batch work and then flushes its own tail. `flushSession` also waits 200 ms and 400 ms between retries, so a momentary ingest refusal recovers instead of showing the not-scored panel. Tests cover a transient 503 then success and a final tail added during an earlier flush. Frontend 137 tests. |
+| `HEAD`    | Fast finish still failed because `flushSession` drained the global outbox head. One retryable batch from an older session blocked every later session, so Try again kept hitting the same head. `readOldestBatchForSession` and a per-session drain now upload only the completing session; the global interval drain stays for background sync. Each drain has its own single-flight key, so the two never share a stalled promise. Tests: a stuck session does not block a healthy one, plus a synchronous 150-key burst in Playwright. Frontend 138 tests, Playwright 3. |
+| `2065242` | Flushes are serialized and retry with short pauses, so a fast finish cannot lose its final tail. |
 | `9618926` | The guide always lights the next key; characters color by correctness: amber for right, grey for wrong. |
 | `76180a6` | The guide delay aligned with amber at 900 ms and adapted 650–1200 ms from rhythm. Superseded. |
 | `9c5e4c9` | UX pass: instant guide key swap, Ctrl+Enter restart, drill padding, aligned eyebrows and quiet-action margins. |
@@ -149,10 +150,11 @@ commit `HEAD`; older rows keep their real hashes.
   session leaves `ACTIVE`, which keeps stored aggregates identical to the ones
   the gate judged. A `409` on a telemetry batch means "done", not "retry", so
   the outbox drops it.
-- **Completion waits for the outbox, not a snapshot of it.** Flushes are chained,
-  so the final key cannot remain pending behind an earlier threshold flush. A
-  retryable upload gets two short pauses before the app admits failure, which
-  covers a momentary ingest refusal without pretending the result was scored.
+- **Completion drains its own session, never the global queue head.** One old
+  retryable batch must not block a new drill's completion. Background sync still
+  drains everything; `flushSession` uses a per-session reader and its own
+  single-flight key. Flushes are chained and retried with short pauses, so the
+  final key cannot remain behind earlier work.
 - **A waiting queue is visible, not silent.** The drill shows one quiet line when
   keys are held locally: offline when the network fails, pending when the server
   asks for a retry. It disappears on the next acknowledged batch. The state is
