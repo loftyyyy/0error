@@ -46,6 +46,21 @@ class FocusedDrillBuilderTest {
 	}
 
 	@Test
+	void aPairContainingSpaceNeverBecomesADoubleSpace() {
+		TierDefinition homeRow = catalogue.require(0);
+
+		for (String pair : List.of("a ", " a")) {
+			String drill = FocusedDrillBuilder.build(homeRow, List.of(pair), null);
+
+			assertThat(drill).as("pair %s", pair).contains(pair);
+			assertThat(drill).doesNotContain("  ");
+			assertThat(validator.validate(drill, homeRow))
+					.as("drill %s", drill)
+					.isEmpty();
+		}
+	}
+
+	@Test
 	void aRetryWithTheSameWeaknessGetsADifferentText() {
 		TierDefinition homeRow = catalogue.require(0);
 

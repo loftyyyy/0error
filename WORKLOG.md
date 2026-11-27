@@ -9,8 +9,8 @@ commit `HEAD`; older rows keep their real hashes.
 ## Current state
 
 - Backend: Spring Boot 4.1 / WebFlux / R2DBC / Flyway / Spring AI, Postgres 18.
-  210 tests, of which the 4 live-AI tests are gated and skipped without keys; the
-  other 206 pass, including the Postgres-backed acceptance tests.
+  212 tests, of which the 4 live-AI tests are gated and skipped without keys; the
+  other 208 pass, including the Postgres-backed acceptance tests.
 - Frontend: React 19 / Vite 8 / Tailwind 4. 143 tests in 21 files, oxlint clean,
   production build green.
 - Postgres is the only service needed. No Redis, no external cache.
@@ -22,7 +22,8 @@ commit `HEAD`; older rows keep their real hashes.
 
 | Commit    | What it does |
 | --------- | ------------ |
-| `HEAD`    | The prompt wraps correctly and scrolls without a visible bar. Spaces are real spaces under `whitespace-pre-wrap`, so lines break between words instead of through them; `overflow-wrap: break-word` handles a word wider than the box. The text sits in a bounded `overflow-y-auto scrollbar-hide` scroller, and the active span is kept inside the box after every index change. CSS hides the bar for Chrome/Safari, Firefox, and Edge. Tests assert real spaces, wrap classes, active-span tracking after a key, the scroller classes, and a 360px viewport with no horizontal overflow. Frontend 143 tests, Playwright 4. |
+| `HEAD`    | Double spaces are gone from new drills. The focused builder joined tokens with a separator even when a token already began or ended with a space, so a space-containing focus pair produced two spaces and forced an extra keypress. A smart join adds a separator only when neither side owns one, and the drill service normalizes all whitespace to single spaces and trims before issuing. Backend tests cover both space-containing pair forms and a generated drill with repeated spaces. Backend 212 tests. |
+| `a087fac` | The prompt wraps at real spaces and scrolls in a hidden-scrollbar box while keeping the active character visible. |
 | `c102409` | Resume restores amber and grey characters through per-position `correctness`. |
 | `633755f` | A `409` telemetry answer settles every queued batch for that closed session; completion then replays or shows the terminal copy. |
 | `983c542` | Completion drains only its own session, so another session's stuck batch cannot block it. |
@@ -104,7 +105,9 @@ commit `HEAD`; older rows keep their real hashes.
 - **Drills are issued, not echoed.** `GET /drills/next` stores the text with an
   issuance id; `POST /sessions` accepts only ids. The persisted session text is
   the source of every telemetry `expected` character. Ids are single-use,
-  same-tier, owned, and expire after 10 minutes.
+  same-tier, owned, and expire after 10 minutes. Whitespace is normalized to one
+  space and trimmed before issue, so a focused pair containing a space cannot
+  create a double space.
 - **An explicit focus overrides analysis, never validation.** `focus` is one
   two-character pair; both keys must belong to the tier, and the tier must still
   be unlocked. It skips the pair and finger reads, so a browser action costs one

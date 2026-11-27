@@ -141,7 +141,9 @@ public class DrillService {
 				.filter(focus::matches);
 
 		String source = generated.isPresent() ? "AI" : "STATIC";
-		String text = generated.orElseGet(() -> pool.pick(definition.tier(), focus, exclude));
+		String text = generated.orElseGet(() -> pool.pick(definition.tier(), focus, exclude))
+				.replaceAll("\\s+", " ")
+				.strip();
 		validator.validate(text, definition).ifPresent(error -> {
 			throw new IllegalStateException("Configured drill is invalid: " + error);
 		});

@@ -100,6 +100,19 @@ class DrillServiceTest {
 	}
 
 	@Test
+	void generatedWhitespaceIsCollapsedBeforeIssuing() {
+		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
+		when(aiDrills.take(0, DrillFocus.none(), null)).thenReturn(Optional.of(
+				"asdf  jkl;  asdf  jkl;  asdf  jkl;  asdf  jkl;  asdf"));
+
+		DrillResponse drill = service().next(USER_ID, 0, null).block();
+
+		assertThat(drill).isNotNull();
+		assertThat(drill.text()).doesNotContain("  ");
+		assertThat(drill.text()).contains("asdf jkl;");
+	}
+
+	@Test
 	void invalidGeneratedDrillFallsBackToStatic() {
 		when(progress.isUnlocked(USER_ID, 0)).thenReturn(Mono.just(true));
 		when(aiDrills.take(0, DrillFocus.none(), null)).thenReturn(Optional.of("not a valid drill"));

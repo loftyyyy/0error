@@ -114,23 +114,38 @@ final class FocusedDrillBuilder {
 			boolean useBase = breakMonotony && built.size() % BASE_TOKEN_INTERVAL == BASE_TOKEN_INTERVAL - 1;
 			String token = useBase ? baseToken(tier) : tokens.get(next++ % tokens.size());
 			built.add(token);
-			length += token.length() + 1;
+			length = joinedLength(built);
 		}
 
 		while (length > tier.maxLength() && built.size() > 1) {
-			String removed = built.remove(built.size() - 1);
-			length -= removed.length() + 1;
+			built.remove(built.size() - 1);
+			length = joinedLength(built);
 		}
 
-		return String.join(" ", built);
+		return joinTokens(built);
+	}
+
+	/** Joins tokens with one separator, never doubling a space a token owns. */
+	private static String joinTokens(List<String> tokens) {
+		StringBuilder text = new StringBuilder();
+		for (String token : tokens) {
+			if (token == null || token.isEmpty()) {
+				continue;
+			}
+			boolean needsSpace = text.length() > 0
+					&& text.charAt(text.length() - 1) != ' '
+					&& token.charAt(0) != ' ';
+			if (needsSpace) {
+				text.append(' ');
+			}
+			text.append(token);
+		}
+		return text.toString().strip();
 	}
 
 	private static int joinedLength(List<String> tokens) {
-		int length = tokens.size() - 1;
-		for (String token : tokens) {
-			length += token.length();
-		}
-		return length;
+		String joined = joinTokens(tokens);
+		return joined.length();
 	}
 
 	private static String baseToken(TierDefinition tier) {

@@ -10,7 +10,8 @@ must contain it; generated text that ignores the target is discarded.
 
 1. The browser asks for the guest identity once and keeps the bearer token.
 2. `GET /api/v1/drills/next?tier=` returns a short drill for the current tier,
-   with a server-issued `drillId`. Three drills form one attempt.
+   with a server-issued `drillId`. Three drills form one attempt. Drill text is
+   whitespace-normalized: runs of spaces collapse to one and edges are trimmed.
 3. Typing is scored locally for the live display only; every keystroke is also
    queued in IndexedDB and sent to the server in batches.
 4. `POST /api/v1/sessions` cites the issued drill ids. The server persists the
